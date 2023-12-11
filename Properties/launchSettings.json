@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "RoxCaseGen": {
+      "commandName": "Project"
+    },
+    "Docker": {
+      "commandName": "Docker"
+    }
+  }
+}

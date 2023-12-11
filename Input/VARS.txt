@@ -1,0 +1,87 @@
+32	% Maximum Temperature Mean Value (C)
+23	% Minimum Temperature Mean Value (C)
+14	% Time of Maximum Temperature Mean Value (HH)
+5	% Time of Minimum Temperature Mean Value (HH)
+58	% Maximum Relative Humidity Mean Value (%)
+16	% Minimum Relative Humidity Mean Value (%)
+1	% Maximum Temperature Standard Deviation (C)
+1	% Minimum Temperature Standard Deviation (C)
+1	% Time of Maximum Temperature Standard Deviation (HH)
+1	% Time of Minimum Temperature Standard Deviation (HH)
+6	% Maximum Relative Humidity Standard Deviation (%)
+3	% Minimum Relative Humidity Standard Deviation (%)
+17	% Wind Magnitude Mean (km/h)
+3	% Wind Magnitude Standard Deviation (km/h)
+3	% Conditioning Days
+415	% Landscape X-Dimension
+361	% Landscape Y-Dimension
+33	% Number of points defining community polygon
+276	% X1
+70	% Y1
+246	% ...
+75
+240
+85
+243
+111
+223
+110
+210
+105
+196
+107
+179
+118
+174
+124
+183
+136
+191
+147
+193
+158
+202
+161
+212
+169
+218
+173
+208
+185
+212
+196
+225
+194
+233
+179
+242
+171
+253
+159
+267
+157
+267
+181
+276
+181
+288
+168
+294
+154
+294
+142
+297
+134
+280
+112
+280
+90
+281
+77
+280
+61
+279
+57
+75	% ASET Mean Value (min)
+10	% ASET Standard Deviation (min)
+1	% Model Selection (0: FARSITE, 1: FLAMMAP)
