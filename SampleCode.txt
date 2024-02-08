@@ -1,0 +1,24 @@
+How to run k-PERIL (for WUINITY):
+
+using k_PERIL_DLL;
+
+namespace WUINITY
+{
+    internal class Program
+    {
+        static void Main(string[] args)
+        {
+            PERIL peril = new PERIL();
+
+            int[,] WUI = PERIL.getPolygonEdgeNodes(WUI_in);     //STATIC METHOD!!
+            int[,] singleBoundary = peril.calcSingularBoundary(30, ASET, windMag, WUI, ROS, Azimuth);       //Returns Single Boundary (no need to use this anymore)
+            peril.calcMultipleBoundaries(cell, ASET, windMag, WUI, ROS, Azimuth)                            //Returns nothing, saves individual boundaries in a list in the object
+            int[,] probBoundary = peril.getProbBoundary()                                                   //returns probabilistic boundary
+            List<int[,]> allBoundaries = peril.getBoundaryList()                                            //returns all boundaries list (if ever needed)
+
+
+        }
+
+    }
+
+}

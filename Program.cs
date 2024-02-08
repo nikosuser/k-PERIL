@@ -209,6 +209,8 @@ namespace RoxCaseGen
                 WUI_in[i, 1] = (int)fileInput[18 + 2 * i + 1, 0];
             }
 
+            PERIL peril = new PERIL();
+
             int[,] WUI = PERIL.getPolygonEdgeNodes(WUI_in);                 //get all the useful WUI polygon nodes based on the given corners. 
 
             FlammapSetup.OutputFile(WUI, Path + "Outputs/WUIboundary.txt");       //save the used urban nodes in file for debugging/visualisation/further inspection.
@@ -331,7 +333,7 @@ namespace RoxCaseGen
                             break;
                     }
                     
-                    int[,] temp = PERIL.getSingularBoundary(30, (int)please.actualASET, please.windMag, WUI, ROS, Azimuth);            //Call k-PERIL to find the boundary of this simulation
+                    int[,] temp = peril.calcSingularBoundary(30, (int)please.actualASET, please.windMag, WUI, ROS, Azimuth);            //Call k-PERIL to find the boundary of this simulation
 
                     for (int j = 0; j < temp.GetLength(0); j++)
                     {

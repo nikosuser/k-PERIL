@@ -75,6 +75,7 @@ V1.11: CHANGED THE STRUCTURE OF THE ALGORITHM TO MORE EFFICIENTLY AND CORRECTLY 
 
  */
 
+using NetTopologySuite.Algorithm;
 using NetTopologySuite.Operation.Distance;
 using RoxCaseGen;
 using System;
@@ -421,12 +422,29 @@ namespace k_PERIL_DLL
     }
     public class PERIL           //the actual program
     {
-        public static int[,] getSingularBoundary(float cell, int tBuffer, float midFlameWindspeed, int[,] WUIarea, float[,] ROS, float[,] azimuth) //The main function
+
+        private List<int[,]> allBoundaries = new List<int[,]>();
+        int[] rasterSize = new int[2];
+
+        /// <summary>
+        /// This method represents one iteration.
+        /// </summary>
+        /// <param name="cell">The square size of each point (most commonly 30m)</param>
+        /// <param name="tBuffer">The prescribed evacuation time, in minutes</param>
+        /// <param name="midFlameWindspeed">The wind speed in the midflame height, representing the entire domain (spatially and temporally)</param>
+        /// <param name="WUIarea">An X by 2 array listing points defining a polygon. This polygon is used as the urban area around which the boundary is calculated.The dimensions of each point are about the domain with (0,0) being the top left corner. </param>
+        /// <param name="ROS">The rate of spread magniture array of size X by Y, in meters per minute</param>
+        /// <param name="azimuth">The rate of spread direction array of size X by Y, in degrees from north, clockwise</param>
+        /// <returns>An X by Y array representing the landscape. Points are 1 if inside the boundary and 0 if outside.</returns>
+        public int[,] calcSingularBoundary(float cell, int tBuffer, float midFlameWindspeed, int[,] WUIarea, float[,] ROS, float[,] azimuth) //The main function
         {
             PERILcore solver = new PERILcore();                                        //instantiate peril preparation
 
             int yDim = azimuth.GetLength(0);
             int xDim = azimuth.GetLength(1);
+
+            this.rasterSize[0] = xDim;
+            this.rasterSize[1] = yDim;
 
             solver.setValues(cell, tBuffer, midFlameWindspeed, ROS, azimuth, xDim, yDim);
 
@@ -472,6 +490,51 @@ namespace k_PERIL_DLL
                 return safetyMatrix;
             }
             return null;
+        }
+        /// <summary>
+        /// The main callable method of k-PERIL.This method calculates multiple iterations and saves them within the object.
+        /// </summary>
+        /// <param name="cell"> An array of The square size of each point (most commonly 30m) for each simulation</param>
+        /// <param name="tBuffer"> An array ofThe prescribed evacuation time, in minutes</param>
+        /// <param name="midFlameWindspeed">An array of The wind speed in the midflame height, representing the entire domain (spatially and temporally)</param>
+        /// <param name="WUIarea">A jagged array of X by 2 array listing points defining a polygon. This polygon is used as the urban area around which the boundary is calculated.The dimensions of each point are about the domain with (0,0) being the top left corner. </param>
+        /// <param name="ROS">A jagged array of The rate of spread magniture array of size X by Y, in meters per minute</param>
+        /// <param name="azimuth">A jagged array of The rate of spread direction array of size X by Y, in degrees from north, clockwise</param>
+        /// <returns>An X by Y array representing the landscape. Points are 1 if inside the boundary and 0 if outside.</returns>
+
+        public void calcMultipleBoundaries(float[] cell, int[] tBuffer, float[] midFlameWindspeed, int[][,] WUIarea, float[][,] ROS, float[][,] azimuth)
+        {
+            for (int i=0; i<cell.Length; i++)
+            {
+                allBoundaries.Append(calcSingularBoundary(cell[i], tBuffer[i], midFlameWindspeed[i], WUIarea[i], ROS[i], azimuth[i]));
+            }
+        }
+        /// <summary>
+        /// Sums up all the boundaries calculated in calcMultipleBoundaries.
+        /// </summary>
+        /// <returns>An X by Y array representing the domain</returns>
+        public int[,] getProbBoundary()
+        {
+            int[,] output = new int[this.rasterSize[0], this.rasterSize[1]];
+            foreach (int[,] boundary in allBoundaries)
+            {
+                for (int i = 0; i < this.rasterSize[0]; i++)
+                {
+                    for (int j = 0; j < this.rasterSize[1]; j++)
+                    {
+                        output[i, j] = output[i, j] + boundary[i, j];
+                    }
+                }
+            }
+            return output;
+        }
+        /// <summary>
+        /// Getter for the list containing all the calculated boundaries
+        /// </summary>
+        /// <returns></returns>
+        public List<int[,]> getBoundaryList()
+        {
+            return allBoundaries;
         }
 
         public static int[,] getLineBoundary(int[,] compoundBoundary)          //Method to get the boundary line from a safety matrix (unlike getCompoundBoundary which needs multiple safety matrices in one matrix to work)
@@ -550,6 +613,7 @@ namespace k_PERIL_DLL
             return outputBoundary;
         }
 
+        /*
         public static int[,] getSingularBoundary(float cellSize, int tBuffer, int[,] WUIarea, float[,] ROStheta)                 //Method to call the main k-PERIL program with ready ROScardinal inputs
         {
             PERILcore solver = new PERILcore();                                        //instantiate peril preparation
@@ -582,7 +646,13 @@ namespace k_PERIL_DLL
 
             return safetyMatrix;
         }
+        */
 
+        /// <summary>
+        /// Function that finds all points defining the perimeter of a polygon. Used to find all points of the WUI area boundary
+        /// </summary>
+        /// <param name="endNodes"> Array of X by 2 representing the coordinates of the polygon nodes</param>
+        /// <returns>Array of Y by 2 of all the points in the perimeter of the polygon</returns>
         public static int[,] getPolygonEdgeNodes(int[,] endNodes)
         {
             int noNodes = endNodes.GetLength(0);
