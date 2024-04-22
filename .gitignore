@@ -365,3 +365,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/Median_Outputs
+/Outputs
+/log.txt
+/ROX.input
+/ROX.shp
+/ROX.shx

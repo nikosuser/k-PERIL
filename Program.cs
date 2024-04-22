@@ -252,7 +252,7 @@ namespace RoxCaseGen
                 Console.WriteLine($"Initiating RUN {simNo}");
                 Console.WriteLine("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
                 Console.WriteLine($"Current Convergence Criterion is {currentError}.");
-                Console.WriteLine($"{consecutiveConvergence} of 20 consecutive criteria under 0.01.");
+                Console.WriteLine($"{consecutiveConvergence} of 20 consecutive criteria under 0.003.");
                 Console.WriteLine("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
                 if (simNo <= 20)
                 {
@@ -346,7 +346,7 @@ namespace RoxCaseGen
                     FlammapSetup.OutputFile(temp, Path + "Outputs/SafetyMatrix" + simNo + ".txt");
                     if (simNo > 20) { currentError = please.calcConvergence(simNo, Path); }
                     FlammapSetup.OutputFile(safetyMatrix, Path + "Outputs/SafetyMatrix.txt");
-                    if (currentError < 0.01) { consecutiveConvergence++; }
+                    if (currentError < 0.003) { consecutiveConvergence++; }
                     else { consecutiveConvergence=0; }
                 }
             }

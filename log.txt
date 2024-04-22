@@ -1,3 +1,0 @@
-windMag windDir maxHumid maxTemp maxTime minHumid minTemp minTime xIgnition yIgnition IgnitionFuel ASET
-19.2132 145 71.44596 30.152002 16 13.049551 21.511164 4 9 43 165 87.49907
-20.286503 303 64.27587 32.867184 12 13.407497 23.282412 6 288 309 165 81.13754
