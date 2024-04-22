@@ -58,4 +58,7 @@
       <HintPath>bin\MapTools.dll</HintPath>
     </Reference>
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="bin\" />
+  </ItemGroup>
 </Project>
