@@ -104,7 +104,7 @@ namespace k_PERIL_DLL
         {
             this.cell = cell;
             this.tBuffer = tBuffer;
-            this.U = U;
+            this.U = (float)(U / 1.15);             //Windspeed to mid flame windspeed correction factor
             this.ROS = ROS;
             this.azimuth = azimuth;
             this.totalX = totalX;
@@ -152,6 +152,12 @@ namespace k_PERIL_DLL
             }
             this.ROStheta = ROStheta;                                                        //return completed matrix
         }
+
+        public void SetROStheta(float[,] rosTheta)
+        {
+            this.ROStheta = rosTheta;
+        }
+
         public void SetRosN() //calculate rosn, a list of all the non-boundary nodes (boundary nodes do not have 8 neighbors and complicate the rest of the algorithm. As such only internal nodes are used, and boundary nodes are only used as "neighbors" for calculations
         {
             List<int> rosN = new List<int>();               //create a new list for rosN
@@ -431,12 +437,12 @@ namespace k_PERIL_DLL
         /// </summary>
         /// <param name="cell">The square size of each point (most commonly 30m)</param>
         /// <param name="tBuffer">The prescribed evacuation time, in minutes</param>
-        /// <param name="midFlameWindspeed">The wind speed in the midflame height, representing the entire domain (spatially and temporally)</param>
+        /// <param name="windSpeed">The wind speed in the midflame height, representing the entire domain (spatially and temporally)</param>
         /// <param name="WUIarea">An X by 2 array listing points defining a polygon. This polygon is used as the urban area around which the boundary is calculated.The dimensions of each point are about the domain with (0,0) being the top left corner. </param>
         /// <param name="ROS">The rate of spread magniture array of size X by Y, in meters per minute</param>
         /// <param name="azimuth">The rate of spread direction array of size X by Y, in degrees from north, clockwise</param>
         /// <returns>An X by Y array representing the landscape. Points are 1 if inside the boundary and 0 if outside.</returns>
-        public int[,] calcSingularBoundary(float cell, int tBuffer, float midFlameWindspeed, int[,] WUIarea, float[,] ROS, float[,] azimuth) //The main function
+        public int[,] calcSingularBoundary(float cell, int tBuffer, float windSpeed, int[,] WUInodes, float[,] ROS, float[,] azimuth) //The main function
         {
             PERILcore solver = new PERILcore();                                        //instantiate peril preparation
 
@@ -446,7 +452,9 @@ namespace k_PERIL_DLL
             this.rasterSize[0] = xDim;
             this.rasterSize[1] = yDim;
 
-            solver.setValues(cell, tBuffer, midFlameWindspeed, ROS, azimuth, xDim, yDim);
+            int[,] WUIarea = getPolygonEdgeNodes(WUInodes);
+
+            solver.setValues(cell, tBuffer, windSpeed, ROS, azimuth, xDim, yDim);
 
             int[,] WUI = solver.delinearise(solver.compoundBoundary(solver.linearise(WUIarea)));     //Linearise the WUIarea array, get its boundary, and delinearise
             /*
@@ -472,7 +480,15 @@ namespace k_PERIL_DLL
             
             if (!noFire)
             {
-                solver.SetROStheta();                                                           //calculate Cardinal Direction ROS
+
+                if (ROS.GetLength(1) == 8)
+                {
+                    solver.SetROStheta(ROS);
+                }
+                else
+                {
+                    solver.SetROStheta(); 
+                }
                 //Console.WriteLine("ROS_THETA GENERATED");                                       //console confirmation message
 
                 solver.SetRosN();                                                               //Calculate ROSn
@@ -496,18 +512,19 @@ namespace k_PERIL_DLL
         /// </summary>
         /// <param name="cell"> An array of The square size of each point (most commonly 30m) for each simulation</param>
         /// <param name="tBuffer"> An array ofThe prescribed evacuation time, in minutes</param>
-        /// <param name="midFlameWindspeed">An array of The wind speed in the midflame height, representing the entire domain (spatially and temporally)</param>
+        /// <param name="windSpeed">An array of The wind speed in the midflame height, representing the entire domain (spatially and temporally)</param>
         /// <param name="WUIarea">A jagged array of X by 2 array listing points defining a polygon. This polygon is used as the urban area around which the boundary is calculated.The dimensions of each point are about the domain with (0,0) being the top left corner. </param>
         /// <param name="ROS">A jagged array of The rate of spread magniture array of size X by Y, in meters per minute</param>
         /// <param name="azimuth">A jagged array of The rate of spread direction array of size X by Y, in degrees from north, clockwise</param>
         /// <returns>An X by Y array representing the landscape. Points are 1 if inside the boundary and 0 if outside.</returns>
 
-        public void calcMultipleBoundaries(float[] cell, int[] tBuffer, float[] midFlameWindspeed, int[][,] WUIarea, float[][,] ROS, float[][,] azimuth)
+        public int[,] calcMultipleBoundaries(float[] cell, int[] tBuffer, float[] windSpeed, int[][,] WUIarea, float[][,] ROS, float[][,] azimuth)
         {
             for (int i=0; i<cell.Length; i++)
             {
-                allBoundaries.Append(calcSingularBoundary(cell[i], tBuffer[i], midFlameWindspeed[i], WUIarea[i], ROS[i], azimuth[i]));
+                allBoundaries.Append(calcSingularBoundary(cell[i], tBuffer[i], windSpeed[i], WUIarea[i], ROS[i], azimuth[i]));
             }
+            return getProbBoundary();
         }
         /// <summary>
         /// Sums up all the boundaries calculated in calcMultipleBoundaries.
