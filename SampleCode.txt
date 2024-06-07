@@ -8,15 +8,21 @@ namespace WUINITY
     {
         static void Main(string[] args)
         {
+
+            int cellsize = 30;                          //grid cell size (meters)
+            int ASET = 120;                             //ASET (min)
+            float windMag = 5;                          //wind magnitude (raw, as recorded in weather station)
+            int[,] WUInodes = [20,20; 20,5; 5,5; 5,20]  //points should be in order, defining a polygon. Top left is (0,0). 
+            int[,] ROS = [12,12,12,... ; 12,12,12,... ; ...];       //ROS, m/min
+            int[,] Azimuth = [45,45,45,... ; 45,45,45,... ; ...];   //direction of maximum spread, degrees
+            
             PERIL peril = new PERIL();
 
-            int[,] WUI = PERIL.getPolygonEdgeNodes(WUI_in);     //STATIC METHOD!!
-            int[,] singleBoundary = peril.calcSingularBoundary(30, ASET, windMag, WUI, ROS, Azimuth);       //Returns Single Boundary (no need to use this anymore)
-            peril.calcMultipleBoundaries(cell, ASET, windMag, WUI, ROS, Azimuth)                            //Returns nothing, saves individual boundaries in a list in the object
-            int[,] probBoundary = peril.getProbBoundary()                                                   //returns probabilistic boundary
-            List<int[,]> allBoundaries = peril.getBoundaryList()                                            //returns all boundaries list (if ever needed)
-
-
+            int[,] singleBoundary = peril.calcSingularBoundary(float cellsize, int tBuffer, float windSpeed, int[,] WUIarea, float[,] ROS, float[,] azimuth);       //Returns Single Boundary (no need to use this anymore)
+            
+            int[,] probBoundary = peril.calcMultipleBoundaries(float[] cellsize, int[] tBuffer, float[] windSpeed, int[][,] WUIarea, float[][,] ROS, float[][,] azimuth)                            //Returns nothing, saves individual boundaries in a list in the object
+            
+            List<int[,]> allBoundaries = peril.getBoundaryList()      
         }
 
     }
