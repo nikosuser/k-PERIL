@@ -116,14 +116,15 @@ Known Bugs / Issues
 
 */
 
-
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using k_PERIL_DLL;
 
 using System.Diagnostics;
 using System.Data;
+using System.Drawing;
 using System.Threading;
 
 namespace RoxCaseGen
@@ -132,227 +133,110 @@ namespace RoxCaseGen
     {
         static void Main(string[] args)
         {
-
-
-            // ----------------------CHANGE VALUES HERE------------------------
-
-            bool runFromExe = false;            //true if you want to compile this code to an executable, false if you want to run it from source. 
-            bool newData = true;                //this is in case FARSITE crashes but you do not want to erase the points you have already calculated. Set it to false and the code will continue from the last point.
-
-            string Path;
-
-            if (runFromExe)
+            const string path = @"D:/OneDrive - Imperial College London/Imperial/PhD\k2PERIL/"; //use this line if you are running the code from VS, change the value to your folder.
+            const int burnDuration = 24;
+            string[] models = { "Farsite",
+                "WISE", 
+                //"ELMFIRE", 
+                //"EPD", 
+                //"LSTM", 
+                "FDS LS1",
+                "FDS LS4" };
+            
+            //cd C:\WISE_Builder-1.0.6-beta.5; java -jar WISE_Builder.jar -s -j C:\jobs
+            
+            //cd C:\WISE_Manager-0.6.beta.5; java -jar WISE_Manager_Ui.jar
+            
+            //Hoursekeeping
+            //Delete Previous Run Leftovers:
+            if (Directory.Exists(path + "/Outputs"))
             {
-                string exePath = Environment.CurrentDirectory;
-                Path = System.IO.Path.GetFullPath(System.IO.Path.Combine(exePath, @"\"));
+                Directory.Delete(path+ "/Outputs", true);
             }
-            else
-            {
-                Path = @"C:\Users\nikos\source\repos\RoxCaseGen\";            //use this line if you are running the code from VS, change the value to your folder..
-            }
-
-            //-----------------------------------------------------------------
-
-            if (newData)
-            {
-                if (Directory.Exists(Path + "Median_Outputs/"))
-                {
-                    DirectoryInfo di = new DirectoryInfo(Path + "Median_Outputs/");
-                    foreach (FileInfo file in di.EnumerateFiles())
-                    {
-                        file.Delete();
-                    }
-                }
-                else
-                {
-                    Directory.CreateDirectory(Path + "Median_Outputs/");
-                }
-            }
-            FlammapSetup please = new FlammapSetup();
-
-            float[,] fileInput = please.parseInputFilesToMemory(Path + "Input/VARS.txt");           
-
-            int[,] safetyMatrix = new int[(int)fileInput[15, 0], (int)fileInput[16, 0]];
-
-            if (!newData)                                                   //if this is a continuation of a failed previous study
-            {
-                if (File.Exists(Path + "Outputs/SafetyMatrix.txt"))
-                {
-                    float[,] temp = please.parseSafetyMatrixToMemory(Path + "Outputs/SafetyMatrix.txt");
-                    for (int i = 0; i < safetyMatrix.GetLength(0); i++)
-                    {
-                        for (int j = 0; j < safetyMatrix.GetLength(1); j++)
-                        {
-                            safetyMatrix[i, j] = (int)temp[j, i];           //read safetymatrix already calculated
-                        }
-                    }
-                }
-                else
-                {
-                    if (File.Exists(Path + "log.txt")) { File.Delete(Path + "log.txt"); }
-                    if (File.Exists(Path + "Outputs/chosenRasterBoundary.txt")) { File.Delete(Path + "Outputs/chosenRasterBoundary.txt"); }
-                    if (File.Exists(Path + "Outputs/chosenBoundary.txt")) { File.Delete(Path + "Outputs/chosenBoundary.txt"); } //if a new case study is starting, delete the previous log file.
-                }
-            }
-            else
-            {
-                if (File.Exists(Path + "log.txt")) { File.Delete(Path + "log.txt"); }
-                if (Directory.Exists(Path + "Outputs/")) { Directory.Delete(Path + "Outputs/", true); }
-                Directory.CreateDirectory(Path + "Outputs/");             //To remove all the output files from the previous run
-            }
-
+            Directory.CreateDirectory(path+ "/Outputs");
+            ModelSetup.prepareNextIteration(path);
+            RunModels.checkInputsExist(path);
+            PERIL peril = new PERIL();
+            ModelSetup please = new ModelSetup();
+            
+            please.burnDuration = burnDuration;
+            please.fuelMoisture = [6, 7, 8, 60, 90];
+            
+            float[,] fileInput = please.parseInputFilesToMemory(path + "Input/VARS.txt");
+            
             int[,] WUI_in = new int[(int)fileInput[17, 0], 2];              //pase in the WUI polygon corners
-
             for (int i = 0; i < fileInput[17, 0]; i++)
             {
                 WUI_in[i, 0] = (int)fileInput[18 + 2 * i, 0];
                 WUI_in[i, 1] = (int)fileInput[18 + 2 * i + 1, 0];
             }
-
-            PERIL peril = new PERIL();
-
+            
+            List<PointF> WUI_f = new List<PointF>();
+            for (int i = 0; i < WUI_in.GetLength(0); i++)
+            {
+                WUI_f.Add(new PointF(WUI_in[i, 0], WUI_in[i, 1]));
+            }  
+            please.WUI = WUI_f;
+            
             int[,] WUI = PERIL.getPolygonEdgeNodes(WUI_in);                 //get all the useful WUI polygon nodes based on the given corners. 
-
-            FlammapSetup.OutputFile(WUI, Path + "Outputs/WUIboundary.txt");       //save the used urban nodes in file for debugging/visualisation/further inspection.
-            float[,] fuelMap = please.parseFARSITEFilesToMemory(Path + "Input/FUELTEMPLATE.asc");
-
-            please.setValues(Path);
-
-            Process FireModel = new Process();                                //declare the FARSITE command line process
-            Process SetEnv= new Process();
-            SetEnv.StartInfo.FileName = Path + "/FLAMMAP/SetEnv.bat";
-
-            int fireModel = (int)fileInput[fileInput.GetLength(0) - 1, 0];
-            switch (fireModel)
-            {
-                case 0:             //FARSITE
-                    FireModel.StartInfo.FileName = Path + "FLAMMAP/TestFARSITE.exe";          //set some of its operating parameters
-                    please.WriteStarterFileFARSITE(Path);
-                    break;
-                case 1:             //FLAMMAP
-                    FireModel.StartInfo.FileName = Path + "RunFLAMMAP.bat";          //set some of its operating parameters
-                    please.WriteStarterFileFLAMMAP(Path);
-                    break;
-            }
-
-            FireModel.StartInfo.Arguments = $"{Path}/ROX.txt";
-            FireModel.StartInfo.UseShellExecute = false;
-            FireModel.StartInfo.CreateNoWindow = false;
-            SetEnv.StartInfo.UseShellExecute = false;
-            SetEnv.StartInfo.CreateNoWindow = false;
-            SetEnv.Start();
-
-            float currentError = 1;
-            float consecutiveConvergence = 0;
+            ModelSetup.OutputFile(WUI, path + "/WUIboundary.txt");       //save the used urban nodes in file for debugging/visualisation/further inspection.
+            please.setValues(path);
+            please.fuelMap = ModelSetup.readASC_int(path + "Input/FUELTEMPLATE.asc");
+            bool[] modelsDone = new bool[models.Length];
+            int[,,] allSafetyBoundaries = new int[6,please.fuelMap.GetLength(0), please.fuelMap.GetLength(1)];
             int simNo = 0;
-            while (consecutiveConvergence<20)
+            int[] consecutiveConvergence = new int[6];
+            float currentError=1;
+            while (!modelsDone.All(x => x))
             {
-                simNo++;
-                Console.WriteLine("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
-                Console.WriteLine($"Initiating RUN {simNo}");
-                Console.WriteLine("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
-                Console.WriteLine($"Current Convergence Criterion is {currentError}.");
-                Console.WriteLine($"{consecutiveConvergence} of 20 consecutive criteria under 0.003.");
-                Console.WriteLine("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
-                if (simNo <= 20)
+                Console.WriteLine($"Sim no: {simNo}, current convergence: ");
+                for (int i = 0; i < models.Length; i++)
                 {
-                    Console.WriteLine($"Convergence not checked yet, not enough results");
-                    Console.WriteLine("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
+                    Console.WriteLine($"{models[i]}: {modelsDone[i]}");
                 }
-
-
-
-                File.Delete(Path + "ROX.shp");                              //delete existing ignition files
-                File.Delete(Path + "ROX.dbf");
-                File.Delete(Path + "ROX.shx");
-                File.Delete(Path + "ROX.input");                            //delete existing FARSITE input file
-                int[] coordinates = please.SelectIgnitionPoint(fuelMap,Path, false);    //choose ignition coordinates
-                please.randomizeValues();                                   //randomise the weather and wind values
-                please.saveUsedData(Path);                                  //dump the selected variables in log.txt
-                please.createTempAndHumidProfile();                         //extrapolate diurnal temperature and humidity profiles
-
-                switch (fireModel)
+                RunModels.setupFarsiteIteration(path + "Farsite/Input/", please);
+                for (int i = 0; i < models.GetLength(0); i++)
                 {
-                    case 0:             //FARSITE
-                        please.createAndWriteFileFARSITE(Path);                            //create the FARSITE input file
-                        break;
-                    case 1:             //FLAMMAP
-                        please.createAndWriteFileFLAMMAP(Path);
-                        break;
-                }
-                createShapefile.createAndWriteShapefile(coordinates[0], coordinates[1], Path);  //create the shapefile for the ignition point
-
-                FireModel.Start();                                            //Start command line FARSITE
-
-                int delayMonitor = 0;                     
-                bool FarsiteKill=false;
-
-                while (!File.Exists(Path + "Median_Outputs/_SpreadRate.asc"))       //Check whether ROS data has been generated (i.e. FARSITE has finished)
-                {
-                    /*
-                    switch (fireModel)          //convert geoTIFF to ASCII
-                    {
-                        case 0:             //FARSITE
-                            break;
-                        case 1:             //FLAMMAP
-                            if (File.Exists(Path + "Median_Outputs/_SpreadRate.tif"))
-                            {
-                                GeoTiffHelpers.GeoTiffHelpers.convertGeotiffToAsc(Path + "Median_Outputs/_SpreadRate.tif", Path + "Median_Outputs/_SpreadRate.asc");
-                                GeoTiffHelpers.GeoTiffHelpers.convertGeotiffToAsc(Path + "Median_Outputs/_SpreadDirection.tif", Path + "Median_Outputs/_SpreadDirection.asc");
-                            }
-                            break;
-                    }
-                    */
-
-                    if (delayMonitor > 300)
-                    {
-                        Console.WriteLine("MODEL PROCESS TAKING TOO LONG (POSSIBLY LOOPS). STOPPING AND SKIPPING CASE");      //if FARSITE takes more than 10 minutes, kill the process
-                        FireModel.Kill();
-                        FarsiteKill = true;
-                        break;
-                    }
-                    System.Threading.Thread.Sleep(1000);
-                    delayMonitor++;
-                }
-                if (!FarsiteKill)               //do the following unless FARSITE was force-killed earlier
-                {
-                    System.Threading.Thread.Sleep(500);                     //wait so that some file write is done
+                    RunModels.convertToSpecificModel(models[i], path, please);
+                    RunModels.RunModel(models[i], path, please,simNo);
+                    float[,] ros = RunModels.retrieveResult(models[i],path,"ROS", please);
+                    float[,] azimuth = RunModels.retrieveResult(models[i],path,"Azimuth", please);
                     
-                    float[,] ROS = please.parseFARSITEFilesToMemory(Path + "Median_Outputs/_SPREADRATE.asc");               //Read ROS magnitude data
-                    File.Move(Path + "Median_Outputs/_SPREADRATE.asc", Path + "Median_Outputs/_SPREADRATE_" + simNo.ToString() + ".asc");
-                    float[,] Azimuth = new float[ROS.GetLength(0), ROS.GetLength(1)];
-                    Thread.Sleep(1000);
-                    switch (fireModel) { 
-                        case 0:
-                            Azimuth = please.parseFARSITEFilesToMemory(Path + "Median_Outputs/_SpreadDirection.asc");      //read ROS direction data
-                            File.Move(Path + "Median_Outputs/_SpreadDirection.asc", Path + "Median_Outputs/_SpreadDirection_" + simNo.ToString() + ".asc");
-                            break;
-                        case 1:
-                            Azimuth = please.parseFARSITEFilesToMemory(Path + "Median_Outputs/_MAXSPREADDIR.asc");      //read ROS direction data
-                            File.Move(Path + "Median_Outputs/_MAXSPREADDIR.asc", Path + "Median_Outputs/_MAXSPREADDIR_" + simNo.ToString() + ".asc");
-                            break;
-                    }
-                    
-                    int[,] temp = peril.calcSingularBoundary(30, (int)please.actualASET, please.windMag, WUI, ROS, Azimuth);            //Call k-PERIL to find the boundary of this simulation
+                    int[,] temp = peril.calcSingularBoundary(30, (int)please.actualASET, please.windMag, WUI, ros, azimuth);            //Call k-PERIL to find the boundary of this simulation
 
                     for (int j = 0; j < temp.GetLength(0); j++)
                     {
                         for (int k = 0; k < temp.GetLength(1); k++)
                         {
-                            safetyMatrix[j, k] += temp[j, k];                                                               //add the trigger boundary safe area to the overall safety matrix 
+                            allSafetyBoundaries[i,j,k] += temp[j, k];
                         }
                     }
                     
-                    FlammapSetup.OutputFile(temp, Path + "Outputs/SafetyMatrix" + simNo + ".txt");
-                    if (simNo > 20) { currentError = please.calcConvergence(simNo, Path); }
-                    FlammapSetup.OutputFile(safetyMatrix, Path + "Outputs/SafetyMatrix.txt");
-                    if (currentError < 0.003) { consecutiveConvergence++; }
-                    else { consecutiveConvergence=0; }
+                    ModelSetup.OutputFile(temp, path + $"Outputs/SafetyMatrix_{models[i]}_" + simNo + ".txt");
+                    if (simNo > 20) { currentError = please.CalcConvergence(simNo, path, models[i]); }
+                    ModelSetup.OutputFile(ModelSetup.GetSlice(allSafetyBoundaries,i), path + $"Outputs/SafetyMatrix_{models[i]}.txt");
+                    if (currentError < 0.003) { consecutiveConvergence[i]++; }
+                    else { consecutiveConvergence[i]=0; }
+                    if (consecutiveConvergence[i] >= 20) { modelsDone[i] = true; }
+                    modelsDone[modelsDone.Length-1] = true;
+                    modelsDone[modelsDone.Length-2] = true;
                 }
+                Console.ReadLine();
+                ModelSetup.prepareNextIteration(path);
             }
-            FlammapSetup.OutputFile(safetyMatrix, Path + "Outputs/SafetyMatrix.txt");
-            //int[,] areaBoundary = PERIL.getDenseBoundaryFromProbBoundary(safetyMatrix, 20);       //not used anymore.
-            //FlammapSetup.OutputFile(areaBoundary, Path + "Outputs/chosenRasterBoundary.txt");
+
+            for (int i = 0; i < models.GetLength(0); i++)
+            {
+                int[,] output = new int[allSafetyBoundaries.GetLength(1), allSafetyBoundaries.GetLength(2)];
+                for (int j = 0; j < output.GetLength(0); j++)
+                {
+                    for (int k = 0; k < output.GetLength(1); k++)
+                    {
+                        output[j, k] = allSafetyBoundaries[i, j, k]; 
+                    }
+                }
+                ModelSetup.OutputFile(output, path + $"Outputs/SafetyMatrix_{models[i]}.txt");
+            }
         }
     }
 }
