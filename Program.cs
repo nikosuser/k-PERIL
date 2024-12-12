@@ -134,12 +134,15 @@ namespace RoxCaseGen
         static void Main(string[] args)
         {
             const string path = @"D:/OneDrive - Imperial College London/Imperial/PhD\k2PERIL/"; //use this line if you are running the code from VS, change the value to your folder.
-            const int burnDuration = 24;
+            
+            const int burnDuration = 12;
+            const int cellsize = 30;
+            
             string[] models = { "Farsite",
                 "WISE", 
-                //"ELMFIRE", 
-                //"EPD", 
-                //"LSTM", 
+                "ELMFIRE", 
+                "EPD", 
+                "LSTM", 
                 "FDS LS1",
                 "FDS LS4" };
             
@@ -154,13 +157,17 @@ namespace RoxCaseGen
                 Directory.Delete(path+ "/Outputs", true);
             }
             Directory.CreateDirectory(path+ "/Outputs");
+            if (Directory.Exists(path + "/Log"))
+            {
+                Directory.Delete(path+ "/Log", true);
+            }
+            Directory.CreateDirectory(path+ "/Log");
+            ModelSetup.cleanupIters(path+"/FDS LS1/");
+            ModelSetup.cleanupIters(path+"/FDS LS4/");
             ModelSetup.prepareNextIteration(path);
             RunModels.checkInputsExist(path);
             PERIL peril = new PERIL();
             ModelSetup please = new ModelSetup();
-            
-            please.burnDuration = burnDuration;
-            please.fuelMoisture = [6, 7, 8, 60, 90];
             
             float[,] fileInput = please.parseInputFilesToMemory(path + "Input/VARS.txt");
             
@@ -181,14 +188,20 @@ namespace RoxCaseGen
             int[,] WUI = PERIL.getPolygonEdgeNodes(WUI_in);                 //get all the useful WUI polygon nodes based on the given corners. 
             ModelSetup.OutputFile(WUI, path + "/WUIboundary.txt");       //save the used urban nodes in file for debugging/visualisation/further inspection.
             please.setValues(path);
+            please.burnDuration = burnDuration;
+            please.fuelMoisture = [6, 7, 8, 60, 90];
+            please.totalRAWSdays = 1 + burnDuration/24;
+            please.cellsize = cellsize;
             please.fuelMap = ModelSetup.readASC_int(path + "Input/FUELTEMPLATE.asc");
             bool[] modelsDone = new bool[models.Length];
-            int[,,] allSafetyBoundaries = new int[6,please.fuelMap.GetLength(0), please.fuelMap.GetLength(1)];
+            int[,,] allSafetyBoundaries = new int[models.GetLength(0),please.fuelMap.GetLength(0), please.fuelMap.GetLength(1)];
             int simNo = 0;
-            int[] consecutiveConvergence = new int[6];
+            int[] consecutiveConvergence = new int[models.GetLength(0)];
             float currentError=1;
             while (!modelsDone.All(x => x))
             {
+                RunModels.checkInputsExist(path);
+                simNo++;
                 Console.WriteLine($"Sim no: {simNo}, current convergence: ");
                 for (int i = 0; i < models.Length; i++)
                 {
@@ -202,7 +215,7 @@ namespace RoxCaseGen
                     float[,] ros = RunModels.retrieveResult(models[i],path,"ROS", please);
                     float[,] azimuth = RunModels.retrieveResult(models[i],path,"Azimuth", please);
                     
-                    int[,] temp = peril.calcSingularBoundary(30, (int)please.actualASET, please.windMag, WUI, ros, azimuth);            //Call k-PERIL to find the boundary of this simulation
+                    int[,] temp = peril.calcSingularBoundary(please.cellsize, (int)please.actualASET, please.windMag, WUI, ros, azimuth);            //Call k-PERIL to find the boundary of this simulation
 
                     for (int j = 0; j < temp.GetLength(0); j++)
                     {
@@ -221,7 +234,8 @@ namespace RoxCaseGen
                     modelsDone[modelsDone.Length-1] = true;
                     modelsDone[modelsDone.Length-2] = true;
                 }
-                Console.ReadLine();
+
+                RunModels.logArrivalTimes(path, simNo);
                 ModelSetup.prepareNextIteration(path);
             }
 

@@ -47,6 +47,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using DotSpatial.Data;
 using MaxRev.Gdal.Core;
+using NetTopologySuite.Noding;
 using Feature = NetTopologySuite.Features.Feature;
 using IFeature = NetTopologySuite.Features.IFeature;
 using Shapefile = NetTopologySuite.IO.Shapefile;
@@ -109,6 +110,8 @@ namespace RoxCaseGen
         public int burnDuration;
         
         public int[] fuelMoisture;
+
+        public int cellsize;
 
         public List<PointF> WUI;
 
@@ -301,7 +304,7 @@ namespace RoxCaseGen
             outputFile.Add("FUEL_MOISTURES_DATA: 255");                                             //all the fuel moistures are the same and hardcoded below for now.
             for (int i = 1; i < 256; i++)
             {
-                outputFile.Add((i - 1).ToString() + " 4 6 13 30 60");
+                outputFile.Add((i - 1).ToString() + $" {this.fuelMoisture[0]} {this.fuelMoisture[1]} {this.fuelMoisture[2]} {this.fuelMoisture[3]} {this.fuelMoisture[4]}");
             }
             outputFile.Add("RAWS_ELEVATION: 190");                                               
             outputFile.Add("RAWS_UNITS: Metric");                                                 //All values declared metric
@@ -438,7 +441,38 @@ namespace RoxCaseGen
 
             return parseFile(linesArray);                                                  //return the output matrix
         }
-        
+
+        public static void cleanupIters(string directoryPath)
+        {
+            // Pattern to match folders in the form IterXXX
+            string folderPattern = @"^Iter\d{3}$";
+
+            try
+            {
+                // Get all subdirectories in the specified directory
+                var directories = Directory.GetDirectories(directoryPath);
+
+                foreach (var dir in directories)
+                {
+                    // Get the folder name (without the full path)
+                    string folderName = Path.GetFileName(dir);
+
+                    // Check if the folder name matches the pattern
+                    if (Regex.IsMatch(folderName, folderPattern))
+                    {
+                        // Delete the folder and its contents
+                        Directory.Delete(dir, true); // true = delete contents recursively
+                        Console.WriteLine($"Deleted folder: {folderName}");
+                    }
+                }
+
+                Console.WriteLine("Cleanup completed.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+            }
+        }
         public static void Copy(string sourceDir, string targetDir)
         {
             Directory.CreateDirectory(targetDir);

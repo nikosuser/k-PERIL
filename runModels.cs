@@ -161,7 +161,7 @@ namespace RoxCaseGen
                 "/WISE/Input/fbp_lookup_table.lut",
                 "/FDS LS1/Input/peril.qgz",
                 "/FDS LS1/Input/fuel13.tif",
-                "/FDS LS1/Input/dem.tif",
+                "/FDS LS1/Input/dem_big.tif",
                 "/ELMFIRE/Input/adj.tif",
                 "/ELMFIRE/Input/asp.tif",
                 "/ELMFIRE/Input/cbd.tif",
@@ -398,23 +398,28 @@ namespace RoxCaseGen
                         @$"--ellipsoid=EPSG:7043 " +
                         @$"--chid='mati' " +
                         @$"--fds_path='{inputPath}' " +
-                        @$"--extent='226788.633400000,237798.633400000,4210255.256100000,4221265.256100000 [EPSG:32235]' " +
+                        @$"--extent_layer='D:\OneDrive - Imperial College London\Imperial\PhD\k2PERIL\Input\FDS LS1\Input\fuelExtent.shp' " +
                         @$"--pixel_size=90 " +
-                        @$"--dem_layer='{path}/FDS LS1/Input/dem.tif' " +
+                        @$"--dem_layer='{path}/FDS LS1/Input/dem_big.tif' " +
                         @$"--landuse_layer='{path}/FDS LS1/Input/fuel13.tif' " +
-                        @$"--landuse_type_filepath='D:\\OneDrive - Imperial College London\\Imperial\\PhD\\ModelComparison\\FDS\\QGIS _ Mati\\Landfire.gov_F13.csv' " +
+                        @$"--landuse_type_filepath='D:/OneDrive - Imperial College London/Imperial/PhD/Mati Simulations/WFDS/Mati/Landfire.gov_F13.csv' " +
                         @$"--fire_layer='{path}/FDS LS1/Input/ignition.shp' " +
                         @$"--wind_filepath='{path}/FDS LS1/Input/weather.csv' " +
-                        @$"--tex_pixel_size=30 " +
+                        @$"--tex_pixel_size={please.cellsize} " +
                         @$"--tex_layer='{path}/FDS LS1/Input/fuel13.tif' " +
-                        @$"--nmesh=127 " +
+                        @$"--nmesh=35 " +
+                        @$"--cell_size=90 " +
+                        @$"--t_begin=0 " +
+                        @$"--t_end={please.burnDuration*3600} " +
+                        @$"--text_filepath= " +
+                        $@"--UtmGrid=TEMPORARY_OUTPUT " + 
                         @$"--export_obst=true";
 
                     string[] commands = new string[]
                     {
                         "C:",
                         $"cd '{qgisProcessorPromptPath}'",
-                        $@".\qgis_process-qgis-ltr.bat run 'Export to NIST FDS:Export terrain' {qgisCommand}"
+                        $@".\qgis_process-qgis-ltr.bat run 'NIST FDS:Export FDS case' {qgisCommand}"
                     };
                     Console.WriteLine(commands);
                     int lsmode = (model == "FDS LS1") ? 1 : 4;
@@ -426,6 +431,7 @@ namespace RoxCaseGen
                     fdstext = fdstext.Replace("_REAC ID='Wood' SOOT_YIELD=0.005 O=2.5 C=3.4 H=6.2",
                         $"&REAC ID='Wood' SOOT_YIELD=0.005 O=2.5 C=3.4 H=6.2");
                     fdstext = fdstext.Replace("      LEVEL_SET_MODE=1 ", $"      LEVEL_SET_MODE={lsmode} ");
+                    fdstext = fdstext.Replace("&WIND SPEED=1., RAMP_SPEED_T='ws', RAMP_DIRECTION_T='wd' /", $"&WIND SPEED=1., RAMP_SPEED='ws', RAMP_DIRECTION='wd' /");
                     fdstext = fdstext.Replace("&TIME T_END=0. /", $"&TIME T_END={please.burnDuration * 3600} /");
                     for (int i = 0; i < 11; i++)
                     {
@@ -472,8 +478,6 @@ namespace RoxCaseGen
                     {
                         Console.WriteLine("Target line not found!");
                     }
-
-                    
                     break;
             }
         }
@@ -504,6 +508,17 @@ namespace RoxCaseGen
                         @"cd 'D:\OneDrive - Imperial College London\Imperial\PhD\RACEWILDFIRE\2Dsmoke\WISE-Preprocessor\bin\Release\net6.0'",
                         $@"& './WISE Preprocessor.exe' 'D:\OneDrive - Imperial College London\Imperial\PhD\k2PERIL\WISE\wise_in.txt'"
                     ], @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",";");
+                    
+                    WISEresults =
+                        Directory.GetDirectories(@"C:\\jobs", "job_*", SearchOption.TopDirectoryOnly);
+                    while (WISEresults.Length == 0)
+                    {
+                        WISEresults =
+                            Directory.GetDirectories(@"C:\\jobs", "job_*", SearchOption.TopDirectoryOnly);
+                        Thread.Sleep(300);
+                    }
+                    runCommand(["cd 'C:/Program Files/WISE/'",@$".\wise.exe -t '{WISEresults[0]}\job.fgmj'"],@"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",";");
+
                     break;
                 case "ELMFIRE":
                     runCommand(
@@ -571,21 +586,63 @@ namespace RoxCaseGen
                     }
                     Directory.CreateDirectory(copyFolder);
                     File.Copy($@"{path}{model}/Input/mati.fds", copyFolder+"/mati.fds", true);
-                    File.Copy($"{path}{model}/Input/mati_tex.png", copyFolder+"/mati_tex.png", true);
+                    if (File.Exists($"{path}{model}/Input/mati_tex.png"))
+                    {
+                        File.Copy($"{path}{model}/Input/mati_tex.png", copyFolder + "/mati_tex.png", true);
+                    }
+
+                    // Path to the text file
+                    string fdsfilePath = $@"{path}{model}/Input/mati.fds";
+
+                    // Target string pattern to find
+                    string targetPattern = @"(\d+)\s·\s(\d+)\smeshes\s";
+
+                    int coreNo = 0;
+
+                    try
+                    {
+                        // Read all lines of the file
+                        string[] lines = File.ReadAllLines(fdsfilePath);
+
+                        foreach (string line in lines)
+                        {
+                            if (line.Contains("meshes"))
+                            {
+                                // Match the pattern to extract the two numbers
+                                Match match = Regex.Match(line, targetPattern);
+
+                                if (match.Success)
+                                {
+                                    // Extract the first two numbers
+                                    int num1 = int.Parse(match.Groups[1].Value);
+                                    int num2 = int.Parse(match.Groups[2].Value);
+
+                                    // Calculate the multiplication
+                                    coreNo = num1 * num2;
+                                }
+                            }
+                        }
+
+                        Console.WriteLine("Target line not found.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error: {ex.Message}");
+                    }
+                    
                     
                     string scriptContent = @$"#!/bin/bash
-#PBS -lwalltime=7:50:00
-#PBS -lselect=1:ncpus=121:mem=128gb
+#PBS -lwalltime=00:30:00
+#PBS -lselect=1:ncpus={coreNo}:mem=32gb
 #PBS -o output.txt
 #PBS -e error.txt
 
 cd $PBS_O_WORKDIR
 
-module load tools/prod
-module load intel/2023a
-export PATH=$PATH:/rds/general/user/nk1017/home/RCS_help/fds/Build/impi_intel_linux_openmp
+module load mpi
+module load fds
 
-mpirun fds_impi_intel_linux_openmp $HOME/peril/Iter{simNo.ToString("000")}/mati.fds";
+mpirun fds $HOME/peril/Iter{simNo.ToString("000")}/mati.fds";
 
                     // File path
                     string filePath = $"{copyFolder}/mati{simNo.ToString("000")}.sh";
@@ -652,9 +709,9 @@ mpirun fds_impi_intel_linux_openmp $HOME/peril/Iter{simNo.ToString("000")}/mati.
                         // File found, copy it to the destination
                         Thread.Sleep(2000);
                         File.Copy(filePath, destinationPath, true); // true to overwrite if it already exists
-                        if (!File.Exists(jobDir + "\\" + targetSubfolder + "\\" + "AT.tif"))
+                        if (!File.Exists(path+"WISE/Output/AT.tif"))
                         {
-                            File.Copy(jobDir + "\\" + targetSubfolder + "\\" + "AT.tif", path+"WISE/Output/at.tif", true);
+                            File.Copy(jobDir + "\\" + targetSubfolder + "\\" + "AT.tif", path+"WISE/Output/AT.tif", true);
                         }
                     }
                     output = ModelSetup.readTiff(destinationPath);
@@ -756,7 +813,11 @@ mpirun fds_impi_intel_linux_openmp $HOME/peril/Iter{simNo.ToString("000")}/mati.
                     {
                         for (int j = 0; j < output.GetLength(1); j++)
                         {
-                            if (i == 0)
+                            if ((int)output_EPD[i,j] == -9999)
+                            {
+                                output[i, j] = 0;
+                            }
+                            else if (i == 0)
                             {
                                 output[i, j] = 0;
                             }
@@ -787,7 +848,7 @@ mpirun fds_impi_intel_linux_openmp $HOME/peril/Iter{simNo.ToString("000")}/mati.
                                 };
                                 Vector resultantVector = Vector.Add(vectors);
                                 output[i, j] = (outputKind == "ROS")
-                                    ? (float)resultantVector.Magnitude
+                                    ? (float)(please.cellsize / resultantVector.Magnitude)
                                     : (float)resultantVector.Direction;
                             }
                         }
@@ -819,7 +880,7 @@ mpirun fds_impi_intel_linux_openmp $HOME/peril/Iter{simNo.ToString("000")}/mati.
                             sw.WriteLine("conda activate newEnv");
                             // Any other commands you want to run
                             sw.WriteLine(
-                                $@"python 'D:\\OneDrive - Imperial College London\\Imperial\\PhD\\FDS2GIS\\findArrivalTime.py' '{path}/{model}/Input/mati.fds/' mati 30 {path}/Input/Farsite/Input/elevation");
+                                $@"python 'D:\\OneDrive - Imperial College London\\Imperial\\PhD\\FDS2GIS\\findArrivalTime.py' '{path}/{model}/Input/mati.fds/' mati {please.cellsize} {path}/Input/Farsite/Input/elevation");
                             sw.WriteLine("exit");
                         }
                     }
@@ -833,6 +894,24 @@ mpirun fds_impi_intel_linux_openmp $HOME/peril/Iter{simNo.ToString("000")}/mati.
                     break;
             }
             return output;
+        }
+
+        public static void logArrivalTimes(string path, int simNo)
+        {
+            string[] necessaryFiles =
+            [
+                "/Farsite/Median_Outputs/_ArrivalTime.asc",
+                "/Farsite/Median_Outputs/_ArrivalTime.prj",
+                "/WISE/Output/AT.tif",
+                "/ELMFIRE/Median_output/time_of_arrival.tif",
+                "/EPD/Input/EPD_AT_OS.asc",
+                "/LSTM/Input/LSTM_AT_OS.asc"
+            ];
+
+            foreach (string file in necessaryFiles)
+            {
+                File.Copy(path + "/" + file, path + "Log/" + simNo.ToString("000_") + Path.GetFileName(file), true);
+            }
         }
     }
 }
