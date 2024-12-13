@@ -208,26 +208,34 @@ namespace RoxCaseGen
                     Console.WriteLine($"{models[i]}: {modelsDone[i]}");
                 }
                 RunModels.setupFarsiteIteration(path + "Farsite/Input/", please);
+                string failFlag = "";
                 for (int i = 0; i < models.GetLength(0); i++)
                 {
                     RunModels.convertToSpecificModel(models[i], path, please);
-                    RunModels.RunModel(models[i], path, please,simNo);
-                    float[,] ros = RunModels.retrieveResult(models[i],path,"ROS", please);
-                    float[,] azimuth = RunModels.retrieveResult(models[i],path,"Azimuth", please);
-                    
-                    int[,] temp = peril.calcSingularBoundary(please.cellsize, (int)please.actualASET, please.windMag, WUI, ros, azimuth);            //Call k-PERIL to find the boundary of this simulation
-
-                    for (int j = 0; j < temp.GetLength(0); j++)
+                    try
                     {
-                        for (int k = 0; k < temp.GetLength(1); k++)
-                        {
-                            allSafetyBoundaries[i,j,k] += temp[j, k];
-                        }
-                    }
+                        RunModels.RunModel(models[i], path, please,simNo);
+                        float[,] ros = RunModels.retrieveResult(models[i],path,"ROS", please);
+                        float[,] azimuth = RunModels.retrieveResult(models[i],path,"Azimuth", please);
                     
-                    ModelSetup.OutputFile(temp, path + $"Outputs/SafetyMatrix_{models[i]}_" + simNo + ".txt");
-                    if (simNo > 20) { currentError = please.CalcConvergence(simNo, path, models[i]); }
-                    ModelSetup.OutputFile(ModelSetup.GetSlice(allSafetyBoundaries,i), path + $"Outputs/SafetyMatrix_{models[i]}.txt");
+                        int[,] temp = peril.calcSingularBoundary(please.cellsize, (int)please.actualASET, please.windMag, WUI, ros, azimuth);            //Call k-PERIL to find the boundary of this simulation
+
+                        for (int j = 0; j < temp.GetLength(0); j++)
+                        {
+                            for (int k = 0; k < temp.GetLength(1); k++)
+                            {
+                                allSafetyBoundaries[i,j,k] += temp[j, k];
+                            }
+                        }
+                        ModelSetup.OutputFile(temp, path + $"Outputs/SafetyMatrix_{models[i]}_" + simNo + ".txt");
+                        if (simNo > 20) { currentError = please.CalcConvergence(simNo, path, models[i]); }
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("==========Model {model[i]} failed, skipping.==============");
+                        failFlag = "_failed";
+                    }
+                    ModelSetup.OutputFile(ModelSetup.GetSlice(allSafetyBoundaries,i), path + $"Outputs/SafetyMatrix_{models[i]}{failFlag}.txt");
                     if (currentError < 0.003) { consecutiveConvergence[i]++; }
                     else { consecutiveConvergence[i]=0; }
                     if (consecutiveConvergence[i] >= 20) { modelsDone[i] = true; }
