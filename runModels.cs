@@ -493,6 +493,19 @@ namespace RoxCaseGen
                         @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",";");
                     break;
                 case "WISE":
+                    //Process builder = startBuilder();
+                    Console.WriteLine("Starting WISE Builder");
+                    ProcessStartInfo startInfo = new ProcessStartInfo(@"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe", @"cd C:\WISE_Builder-1.0.6-beta.5; java -jar WISE_Builder.jar -s -j C:\jobs")
+                    {
+                        UseShellExecute = false, // Allows redirection
+                        RedirectStandardOutput = true, // Manage output
+                        RedirectStandardError = true,
+                        CreateNoWindow = true // Prevents the window from appearing
+                    };
+                    Process procBuilder = Process.Start(startInfo);
+                    
+                    Thread.Sleep(8000);
+                    
                     string[] WISEresults =
                         Directory.GetDirectories(@"C:\\jobs", "job_*", SearchOption.TopDirectoryOnly);
                     if (WISEresults.Length > 0)
@@ -515,10 +528,13 @@ namespace RoxCaseGen
                     {
                         WISEresults =
                             Directory.GetDirectories(@"C:\\jobs", "job_*", SearchOption.TopDirectoryOnly);
-                        Thread.Sleep(300);
+                        Thread.Sleep(5000);
                     }
                     runCommand(["cd 'C:/Program Files/WISE/'",@$".\wise.exe -t '{WISEresults[0]}\job.fgmj'"],@"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",";");
-
+                    
+                    Console.WriteLine("Killing WISE Builder");
+                    procBuilder.Kill();
+                    
                     break;
                 case "ELMFIRE":
                     runCommand(
@@ -849,7 +865,7 @@ mpirun fds $HOME/peril/Iter{simNo.ToString("000")}/mati.fds";
                                 Vector resultantVector = Vector.Add(vectors);
                                 output[i, j] = (outputKind == "ROS")
                                     ? (float)(please.cellsize / resultantVector.Magnitude)
-                                    : (float)resultantVector.Direction;
+                                    : (float)resultantVector.Direction + 180;
                             }
                         }
                     }
@@ -896,6 +912,30 @@ mpirun fds $HOME/peril/Iter{simNo.ToString("000")}/mati.fds";
             return output;
         }
 
+        public static Process startBuilder()
+        {
+            var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    RedirectStandardInput = true,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    WorkingDirectory = @"C:\WISE_Builder-1.0.6-beta.5",
+                }
+            };
+            process.Start();
+            // Pass multiple commands to cmd.exe
+            using (var sw = process.StandardInput)
+            {
+                if (sw.BaseStream.CanWrite)
+                {
+                    sw.WriteLine(@"cd C:\WISE_Builder-1.0.6-beta.5; java -jar WISE_Builder.jar -s -j C:\jobs");
+                }
+            }
+            return process;
+        }
         public static void logArrivalTimes(string path, int simNo)
         {
             string[] necessaryFiles =
@@ -910,7 +950,8 @@ mpirun fds $HOME/peril/Iter{simNo.ToString("000")}/mati.fds";
 
             foreach (string file in necessaryFiles)
             {
-                File.Copy(path + "/" + file, path + "Log/" + simNo.ToString("000_") + Path.GetFileName(file), true);
+                if (File.Exists(path + "/" + file))
+                    File.Copy(path + "/" + file, path + "Log/" + simNo.ToString("000_") + Path.GetFileName(file), true);
             }
         }
     }

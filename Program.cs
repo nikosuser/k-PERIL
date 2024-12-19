@@ -133,9 +133,18 @@ namespace RoxCaseGen
     {
         static void Main(string[] args)
         {
-            const string path = @"D:/OneDrive - Imperial College London/Imperial/PhD\k2PERIL/"; //use this line if you are running the code from VS, change the value to your folder.
-            
-            const int burnDuration = 12;
+            string path = Environment.GetEnvironmentVariable("RUNPATH");
+
+            if (!string.IsNullOrEmpty(path))
+            {
+                Console.WriteLine($"RUNPATH is: {path}");
+            }
+            else
+            {
+                Console.WriteLine("RUNPATH is not set.");
+            }
+
+            const int burnDuration = 3;
             const int cellsize = 30;
             
             string[] models = { "Farsite",
@@ -143,8 +152,7 @@ namespace RoxCaseGen
                 "ELMFIRE", 
                 "EPD", 
                 "LSTM", 
-                "FDS LS1",
-                "FDS LS4" };
+                "FDS LS1"};
             
             //cd C:\WISE_Builder-1.0.6-beta.5; java -jar WISE_Builder.jar -s -j C:\jobs
             
@@ -157,11 +165,11 @@ namespace RoxCaseGen
                 Directory.Delete(path+ "/Outputs", true);
             }
             Directory.CreateDirectory(path+ "/Outputs");
-            if (Directory.Exists(path + "/Log"))
+            if (Directory.Exists(path + "/Log/"))
             {
-                Directory.Delete(path+ "/Log", true);
+                Directory.Delete(path+ "/Log/", true);
             }
-            Directory.CreateDirectory(path+ "/Log");
+            Directory.CreateDirectory(path+ "/Log/");
             ModelSetup.cleanupIters(path+"/FDS LS1/");
             ModelSetup.cleanupIters(path+"/FDS LS4/");
             ModelSetup.prepareNextIteration(path);
@@ -186,7 +194,8 @@ namespace RoxCaseGen
             please.WUI = WUI_f;
             
             int[,] WUI = PERIL.getPolygonEdgeNodes(WUI_in);                 //get all the useful WUI polygon nodes based on the given corners. 
-            ModelSetup.OutputFile(WUI, path + "/WUIboundary.txt");       //save the used urban nodes in file for debugging/visualisation/further inspection.
+            string[] header = ModelSetup.getHeader(path + "Input/FUELTEMPLATE.asc");
+            ModelSetup.Output_ASC_File(header,WUI, path + "/WUIboundary.txt");       //save the used urban nodes in file for debugging/visualisation/further inspection.
             please.setValues(path);
             please.burnDuration = burnDuration;
             please.fuelMoisture = [6, 7, 8, 60, 90];
@@ -217,7 +226,11 @@ namespace RoxCaseGen
                         RunModels.RunModel(models[i], path, please,simNo);
                         float[,] ros = RunModels.retrieveResult(models[i],path,"ROS", please);
                         float[,] azimuth = RunModels.retrieveResult(models[i],path,"Azimuth", please);
-                    
+                        if (models[i] == "EPD" || models[i] == "LSTM")
+                        {
+                            ModelSetup.Output_ASC_File(header,ros, $"{path}/Input/{models[i]}_ROS_{simNo}.asc");
+                            ModelSetup.Output_ASC_File(header,azimuth, $"{path}/Input/{models[i]}_AZ_{simNo}.asc");
+                        }
                         int[,] temp = peril.calcSingularBoundary(please.cellsize, (int)please.actualASET, please.windMag, WUI, ros, azimuth);            //Call k-PERIL to find the boundary of this simulation
 
                         for (int j = 0; j < temp.GetLength(0); j++)
@@ -227,15 +240,15 @@ namespace RoxCaseGen
                                 allSafetyBoundaries[i,j,k] += temp[j, k];
                             }
                         }
-                        ModelSetup.OutputFile(temp, path + $"Outputs/SafetyMatrix_{models[i]}_" + simNo + ".txt");
+                        ModelSetup.Output_ASC_File(header, temp, path + $"Outputs/SafetyMatrix_{models[i]}_" + simNo + ".txt");
                         if (simNo > 20) { currentError = please.CalcConvergence(simNo, path, models[i]); }
                     }
                     catch (Exception e)
                     {
-                        Console.WriteLine("==========Model {model[i]} failed, skipping.==============");
+                        Console.WriteLine($"==========Model {models[i]} failed, skipping.==============");
                         failFlag = "_failed";
                     }
-                    ModelSetup.OutputFile(ModelSetup.GetSlice(allSafetyBoundaries,i), path + $"Outputs/SafetyMatrix_{models[i]}{failFlag}.txt");
+                    ModelSetup.Output_ASC_File(header, ModelSetup.GetSlice(allSafetyBoundaries,i), path + $"Outputs/SafetyMatrix_{models[i]}{failFlag}.txt");
                     if (currentError < 0.003) { consecutiveConvergence[i]++; }
                     else { consecutiveConvergence[i]=0; }
                     if (consecutiveConvergence[i] >= 20) { modelsDone[i] = true; }
@@ -257,7 +270,7 @@ namespace RoxCaseGen
                         output[j, k] = allSafetyBoundaries[i, j, k]; 
                     }
                 }
-                ModelSetup.OutputFile(output, path + $"Outputs/SafetyMatrix_{models[i]}.txt");
+                ModelSetup.Output_ASC_File(header, output, path + $"Outputs/SafetyMatrix_{models[i]}.txt");
             }
         }
     }

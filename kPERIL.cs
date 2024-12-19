@@ -349,7 +349,7 @@ namespace k_PERIL_DLL
                     output[i, j] = (int)this.graph[j * totalY + i,2]*1000;            //convert the output from a linearised network back to the 2D raster
                 }
             }
-            FlammapSetup.OutputFile(output, @"C:\Users\nikos\source\repos\RoxCaseGen\Outputs\individualTimes.txt");
+            FlammapSetup.Output_ASC_File(output, @"C:\Users\nikos\source\repos\RoxCaseGen\Outputs\individualTimes.txt");
             */
             return distance;                                    //return the distance array
         }
@@ -391,7 +391,7 @@ namespace k_PERIL_DLL
                     output[i,j] = (int)this.debugMatrix[j*totalY + i];            //convert the output from a linearised network back to the 2D raster
                 }
             }
-            FlammapSetup.OutputFile(output, @"C:\Users\nikos\source\repos\RoxCaseGen\Outputs\arrivalTime.txt");
+            FlammapSetup.Output_ASC_File(output, @"C:\Users\nikos\source\repos\RoxCaseGen\Outputs\arrivalTime.txt");
             */
             
 

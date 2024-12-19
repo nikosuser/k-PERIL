@@ -345,6 +345,7 @@ namespace RoxCaseGen
                     intOutput[i, j] = (int)floatOutput[i, j]; // Explicit cast from float to int
                 }
             }
+            
             return intOutput; //return the output matrix
         }
         
@@ -483,10 +484,34 @@ namespace RoxCaseGen
             foreach(var directory in Directory.GetDirectories(sourceDir))
                 Copy(directory, Path.Combine(targetDir, Path.GetFileName(directory)));
         }
-        public static void OutputFile(int[,] boundary, string PerilOutput)      //output variable to a new text file, shamelessly stolen
+        public static void Output_ASC_File(string[] header, float[,] boundary, string PerilOutput)      //output variable to a new text file, shamelessly stolen
         {
             using (var sw = new StreamWriter(PerilOutput))  //beyond here the code has been shamelessly stolen
             {
+                for (int i = 0; i < header.Length; i++)
+                {
+                    sw.WriteLine(header[i]);
+                }
+                for (int i = 0; i < boundary.GetLength(1); i++)   //for all elements in the output array
+                {
+                    for (int j = 0; j < boundary.GetLength(0); j++)
+                    {
+                        sw.Write(boundary[j, i] + " ");       //write the element in the file
+                    }
+                    sw.Write("\n");
+                }
+                sw.Flush();                                 //i dont really know
+                sw.Close();                                 //close opened output text file
+            }
+        }
+        public static void Output_ASC_File(string[] header, int[,] boundary, string PerilOutput)      //output variable to a new text file, shamelessly stolen
+        {
+            using (var sw = new StreamWriter(PerilOutput))  //beyond here the code has been shamelessly stolen
+            {
+                for (int i = 0; i < header.Length; i++)
+                {
+                    sw.WriteLine(header[i]);
+                }
                 for (int i = 0; i < boundary.GetLength(1); i++)   //for all elements in the output array
                 {
                     for (int j = 0; j < boundary.GetLength(0); j++)
@@ -746,6 +771,25 @@ namespace RoxCaseGen
             return elevation[x, y];
         }
 
+        public static string[] getHeader(string filePath)
+        {
+            if (!File.Exists(filePath))
+                throw new FileNotFoundException($"The file {filePath} does not exist.");
+
+            string[] headerLines = new string[6];
+            using (StreamReader reader = new StreamReader(filePath))
+            {
+                for (int i = 0; i < 6; i++)
+                {
+                    string line = reader.ReadLine();
+                    if (line == null)
+                        throw new FormatException($"Unexpected end of file while reading the header at line {i + 1}.");
+                
+                    headerLines[i] = line.Trim(); // Store the entire line in the array
+                }
+            }
+            return headerLines;
+        }
         public static float[,] readTiff(string filePath)
         {
             GdalBase.ConfigureAll();
@@ -826,7 +870,8 @@ namespace RoxCaseGen
                 string[] filePaths = Directory.GetFiles(path + folder);
                 foreach (string filePath in filePaths)
                 {
-                    File.Delete(filePath);
+                    if (File.Exists(filePath))
+                        File.Delete(filePath);
                 }
             }
 
