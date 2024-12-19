@@ -156,6 +156,7 @@ namespace RoxCaseGen
                 "/Farsite/Input/landscape.lcp",
                 "/Farsite/ROX.txt",
                 "/WISE/Input/fuel.asc",
+                "/WISE/Input/fuel.prj",
                 "/WISE/Input/elevation.asc",
                 "/WISE/Input/elevation.prj",
                 "/WISE/Input/fbp_lookup_table.lut",
@@ -494,6 +495,19 @@ namespace RoxCaseGen
                         @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",";");
                     break;
                 case "WISE":
+                    
+                    Console.WriteLine("Starting WISE Manager");
+                    ProcessStartInfo startInfoManager = new ProcessStartInfo(@"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe", @"cd C:\WISE_Manager-0.6.beta.5; java -jar WISE_Manager_Ui.jar")
+                    {
+                        UseShellExecute = false, // Allows redirection
+                        RedirectStandardOutput = true, // Manage output
+                        RedirectStandardError = true,
+                        CreateNoWindow = true // Prevents the window from appearing
+                    };
+                    Process procBuilderManager = Process.Start(startInfoManager);
+                    
+                    Thread.Sleep(4000);
+/*
                     //Process builder = startBuilder();
                     Console.WriteLine("Starting WISE Builder");
                     ProcessStartInfo startInfo = new ProcessStartInfo(@"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe", @"cd C:\WISE_Builder-1.0.6-beta.5; java -jar WISE_Builder.jar -s -j C:\jobs")
@@ -506,7 +520,7 @@ namespace RoxCaseGen
                     Process procBuilder = Process.Start(startInfo);
                     
                     Thread.Sleep(8000);
-                    
+                    */
                     string[] WISEresults =
                         Directory.GetDirectories(@"C:\\jobs", "job_*", SearchOption.TopDirectoryOnly);
                     if (WISEresults.Length > 0)
@@ -534,8 +548,8 @@ namespace RoxCaseGen
                     runCommand(["cd 'C:/Program Files/WISE/'",@$".\wise.exe -t '{WISEresults[0]}\job.fgmj'"],@"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",";");
                     
                     Console.WriteLine("Killing WISE Builder");
-                    procBuilder.Kill();
-                    
+                    //procBuilder.Kill();
+
                     break;
                 case "ELMFIRE":
                     runCommand(

@@ -874,7 +874,10 @@ namespace RoxCaseGen
                         File.Delete(filePath);
                 }
             }
-
+            foreach (var javaProc in Process.GetProcessesByName("java"))
+            {
+                javaProc.Kill();
+            }
         }
     }
     class Vector
