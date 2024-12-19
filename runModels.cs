@@ -162,6 +162,7 @@ namespace RoxCaseGen
                 "/FDS LS1/Input/peril.qgz",
                 "/FDS LS1/Input/fuel13.tif",
                 "/FDS LS1/Input/dem_big.tif",
+                "/FDS LS1/Input/Landfire.gov_F13.csv",
                 "/ELMFIRE/Input/adj.tif",
                 "/ELMFIRE/Input/asp.tif",
                 "/ELMFIRE/Input/cbd.tif",
@@ -398,11 +399,11 @@ namespace RoxCaseGen
                         @$"--ellipsoid=EPSG:7043 " +
                         @$"--chid='mati' " +
                         @$"--fds_path='{inputPath}' " +
-                        @$"--extent_layer='D:\OneDrive - Imperial College London\Imperial\PhD\k2PERIL\Input\FDS LS1\Input\fuelExtent.shp' " +
+                        @$"--extent_layer='{path}\Input\FDS LS1\Input\fuelExtent.shp' " +
                         @$"--pixel_size=90 " +
                         @$"--dem_layer='{path}/FDS LS1/Input/dem_big.tif' " +
                         @$"--landuse_layer='{path}/FDS LS1/Input/fuel13.tif' " +
-                        @$"--landuse_type_filepath='D:/OneDrive - Imperial College London/Imperial/PhD/Mati Simulations/WFDS/Mati/Landfire.gov_F13.csv' " +
+                        @$"--landuse_type_filepath='{path}\Input\FDS LS1\Input\Landfire.gov_F13.csv' " +
                         @$"--fire_layer='{path}/FDS LS1/Input/ignition.shp' " +
                         @$"--wind_filepath='{path}/FDS LS1/Input/weather.csv' " +
                         @$"--tex_pixel_size={please.cellsize} " +
@@ -518,8 +519,8 @@ namespace RoxCaseGen
 
                     runCommand(
                     [
-                        @"cd 'D:\OneDrive - Imperial College London\Imperial\PhD\RACEWILDFIRE\2Dsmoke\WISE-Preprocessor\bin\Release\net6.0'",
-                        $@"& './WISE Preprocessor.exe' 'D:\OneDrive - Imperial College London\Imperial\PhD\k2PERIL\WISE\wise_in.txt'"
+                        $@"cd '{Environment.GetEnvironmentVariable("WISEPREPROCPATH")}'",
+                        $@"& './WISE Preprocessor.exe' '{path}\WISE\wise_in.txt'"
                     ], @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",";");
                     
                     WISEresults =
@@ -707,7 +708,7 @@ mpirun fds $HOME/peril/Iter{simNo.ToString("000")}/mati.fds";
                     string targetSubfolder = @"Outputs\scen0";
                     string fileName = file + ".tif";
                     string destinationPath =
-                        @"D:\OneDrive - Imperial College London\Imperial\PhD\k2PERIL\WISE\Output\" + file +
+                        @$"{path}\WISE\Output\" + file +
                         ".tif";
 
                     var jobDirectories =
@@ -736,7 +737,7 @@ mpirun fds $HOME/peril/Iter{simNo.ToString("000")}/mati.fds";
                     string sourceFolder =
                         @"\\wsl.localhost\Ubuntu-22.04\home\nikosuser\ELMFIRE\elmfire\tutorials\kPERIL\outputs/";
                     string destinationFolder =
-                        @"D:\OneDrive - Imperial College London\Imperial\PhD\k2PERIL\ELMFIRE\Median_output/";
+                        @$"{path}\ELMFIRE\Median_output/";
 
                     string ELMoutputname = outputKind == "ROS" ? "vs" : "time_of_arrival";
 
@@ -815,7 +816,7 @@ mpirun fds $HOME/peril/Iter{simNo.ToString("000")}/mati.fds";
                     break;
                 case "EPD":
                 case "LSTM":
-                    string googlePath = @$"D:\OneDrive - Imperial College London\Imperial\PhD\k2PERIL\{model}\Input\";
+                    string googlePath = @$"{path}\{model}\Input\";
 
                     while (!File.Exists(googlePath + model + "_AT_OS.asc"))
                     {
