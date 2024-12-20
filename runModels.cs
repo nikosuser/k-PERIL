@@ -384,8 +384,8 @@ namespace RoxCaseGen
                     File.WriteAllLines(path + "/" + model + "/Input/weather.csv", fdsWeather.ToArray());
 
                     string addCRStoPointCommand =
-                        @$" run native:reprojectlayer --distance_units=meters --area_units=m2 --ellipsoid=EPSG:7043 --INPUT='D:/OneDrive - Imperial College London/Imperial/PhD/k2PERIL/Farsite/Input/ROX.shx|layername=ROX' --TARGET_CRS='EPSG:32235' --CONVERT_CURVED_GEOMETRIES=false --OPERATION= --OUTPUT='D:/OneDrive - Imperial College London/Imperial/PhD/k2PERIL/{model}/Input/ignition.shp'";
-                    string qgisProcessorPromptPath = @"C:\Program Files\QGIS 3.34.11\bin/";
+                        @$" run native:reprojectlayer --distance_units=meters --area_units=m2 --ellipsoid=EPSG:7043 --INPUT='{path}/Farsite/Input/ROX.shp' --TARGET_CRS='EPSG:32235' --CONVERT_CURVED_GEOMETRIES=false --OPERATION= --OUTPUT='{path}/{model}/Input/ignition.shp'";
+                    string qgisProcessorPromptPath = @"C:\Program Files\QGIS 3.34.13\bin/";
                     string[] commandsPoint = new string[]
                     {
                         $"cd '{qgisProcessorPromptPath}'",
@@ -506,7 +506,7 @@ namespace RoxCaseGen
                     };
                     Process procBuilderManager = Process.Start(startInfoManager);
                     
-                    Thread.Sleep(4000);
+                    Thread.Sleep(6000);
 /*
                     //Process builder = startBuilder();
                     Console.WriteLine("Starting WISE Builder");
@@ -593,7 +593,7 @@ namespace RoxCaseGen
                             sw.WriteLine(@"C:/Users/nikos/miniconda3/Scripts/activate.bat");
                             sw.WriteLine("conda activate newEnv");
                             sw.WriteLine(
-                                $"python D:/GoogleModel/wildfire_conv_ltsm/preprocessor.py california {model} \"D:/OneDrive - Imperial College London/Imperial/PhD/k2PERIL/{model}/Input\" {modelSetup.burnDuration} {modelSetup.xIgnition_raster} {modelSetup.yIgnition_raster} {modelSetup.year} {modelSetup.month} {modelSetup.totalRAWSdays - (int)(modelSetup.burnDuration / 24)} {23 - modelSetup.burnDuration % 24}00");
+                                $"python D:/GoogleModel/wildfire_conv_ltsm/preprocessor.py california {model} \"{path}/{model}/Input\" {modelSetup.burnDuration} {modelSetup.xIgnition_raster} {modelSetup.yIgnition_raster} {modelSetup.year} {modelSetup.month} {modelSetup.totalRAWSdays - (int)(modelSetup.burnDuration / 24)} {23 - modelSetup.burnDuration % 24}00");
                             sw.WriteLine("exit");
                         }
                     }

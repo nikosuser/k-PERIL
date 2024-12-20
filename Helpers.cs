@@ -618,15 +618,15 @@ namespace RoxCaseGen
             
             PointF WUIcenter = GetCentroid(this.WUI);
 
-            this.xIgnition_raster = (int)(rand.NextDouble() * ncols);        //get random ignition location
-            this.yIgnition_raster = (int)(rand.NextDouble() * nrows);
+            this.xIgnition_raster = (int)((rand.NextDouble()*0.8+0.1) * ncols);        //get random ignition location
+            this.yIgnition_raster = (int)((rand.NextDouble()*0.8+0.1) * nrows);         //avoid the absolute boundaries of the landscape
 
             this.IgnitionFuelModel = (int)this.fuelMap[this.yIgnition_raster, this.xIgnition_raster];      //find the fuel inside the ignition point
 
             while (this.IgnitionFuelModel == -9999 || this.IgnitionFuelModel == 91 || this.IgnitionFuelModel == 92 || this.IgnitionFuelModel == 93 || this.IgnitionFuelModel == 98 || this.IgnitionFuelModel == 99 || PointDistance(this.xIgnition_raster,this.yIgnition_raster,(int)WUIcenter.X, (int)WUIcenter.Y) < Math.Min(ncols / 3, nrows / 3) ) //if the ignition point has nonfuel on it, or is outside the designated area, retry
             {
-                this.xIgnition_raster = (int)(rand.NextDouble() * ncols);
-                this.yIgnition_raster = (int)(rand.NextDouble() * nrows);
+                this.xIgnition_raster = (int)((rand.NextDouble()*0.8+0.1) * ncols);
+                this.yIgnition_raster = (int)((rand.NextDouble()*0.8+0.1) * nrows);
                 this.IgnitionFuelModel = (int)this.fuelMap[this.yIgnition_raster, this.xIgnition_raster];
             }
 
