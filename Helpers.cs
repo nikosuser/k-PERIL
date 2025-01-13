@@ -26,6 +26,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Globalization;
 using k_PERIL_DLL;
 
 using NetTopologySuite;
@@ -42,16 +43,22 @@ using System.Data;
 using BitMiracle.LibTiff.Classic;
 using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
+using System.Runtime.CompilerServices;
 using NetTopologySuite.Index.Strtree;
 using System.Text.RegularExpressions;
 using System.Threading;
 using DotSpatial.Data;
 using MaxRev.Gdal.Core;
 using NetTopologySuite.Noding;
+using OSGeo.OGR;
+using OSGeo.OSR;
 using Feature = NetTopologySuite.Features.Feature;
 using IFeature = NetTopologySuite.Features.IFeature;
 using Shapefile = NetTopologySuite.IO.Shapefile;
 using static NetTopologySuite.IO.Esri.Shapefile;
+using GDAL_Driver = OSGeo.GDAL.Driver;
+using OGR_Driver = OSGeo.GDAL.Driver;
+using Geometry = NetTopologySuite.Geometries.Geometry;
 
 
 namespace RoxCaseGen
@@ -115,6 +122,9 @@ namespace RoxCaseGen
 
         public List<PointF> WUI;
 
+        public int[,] fmc;
+        public int[,] fmc_A13;
+
         public void setValues(string Path)                                              //Reads the VARS.txt input file and passes the input variables to the class.
         {
             float[,] fileInput = parseInputFilesToMemory(Path + "/Input/VARS.txt");      //read the file contents and store each line in an array element
@@ -138,8 +148,8 @@ namespace RoxCaseGen
             this.varAvgWindMag = (int)fileInput[13, 0];
 
             this.totalRAWSdays = (int)fileInput[14, 0];
-            this.ASET = (int)fileInput[fileInput.GetLength(0) - 3, 0];
-            this.varASET = (int)fileInput[fileInput.GetLength(0) - 2, 0];
+            this.ASET = (int)fileInput[fileInput.GetLength(0) - 2, 0];
+            this.varASET = (int)fileInput[fileInput.GetLength(0) - 1, 0];
             //Console.WriteLine("Values Parsed!");
         }
 
@@ -220,20 +230,26 @@ namespace RoxCaseGen
             }
             else                                                                //if the coldest temperature happens after midnight
             {
-                for (int i = minTime; i <= maxTime; i++)
+                for (int i = minTime; i < maxTime; i++)
                 {
-                    tempProfile[i] = (float)(minTemp + (maxTemp - minTemp) * (0.5 + 0.5 * (float)Math.Cos((maxTime - i) * Math.PI / (maxTime - minTime))));
+                    tempProfile[i] = (float)(minTemp + (maxTemp - minTemp) *
+                        (0.5 + 0.5 * (float)Math.Cos((maxTime - i) * Math.PI / (maxTime - minTime))));
+                    //tempProfile[i] = (float)(minTemp + (maxTemp - minTemp) * (0.5 + 0.5 * (float)Math.Cos((maxTime - i) * Math.PI / (maxTime - minTime))));
                     humidProfile[i] = (float)(maxHumid - (maxHumid - minHumid) * (0.5 + 0.5 * (float)Math.Cos((maxTime - i) * Math.PI / (maxTime - minTime))));
                 }
                 for (int j = 0; j < minTime; j++)
                 {
-                    tempProfile[j] = (float)(maxTemp - (maxTemp - minTemp) * (0.5 + 0.5 * (float)Math.Cos((j + 24 - maxTime) * Math.PI / (24 + maxTime - minTime))));
-                    humidProfile[j] = (float)(minHumid + (maxHumid - minHumid) * (0.5 + 0.5 * (float)Math.Cos((j + 24 - maxTime) * Math.PI / (24 + maxTime - minTime))));
+                    tempProfile[j] = (float)(minTemp + (maxTemp - minTemp) *
+                        (0.5 + 0.5 * (float)Math.Cos(Math.PI + (j - minTime) * Math.PI / (24 - maxTime + minTime))));
+                    //tempProfile[j] = (float)(minTemp + (maxTemp - minTemp) * (0.5 + 0.5 * (float)Math.Cos((j + 24 - maxTime) * Math.PI / (24 + maxTime - minTime))));
+                    humidProfile[j] = (float)(maxHumid - (maxHumid - minHumid) * (0.5 + 0.5 * (float)Math.Cos((j + 24 - maxTime) * Math.PI / (24 - maxTime + minTime))));
                 }
-                for (int k = maxTime + 1; k < 24; k++)
+                for (int k = maxTime; k < 24; k++)
                 {
-                    tempProfile[k] = (float)(minTemp + (maxTemp - minTemp) * (0.5 + 0.5 * (float)Math.Cos((k - minTime) * Math.PI / (24 - maxTime + minTime))));
-                    humidProfile[k] = (float)(maxHumid - (maxHumid - minHumid) * (0.5 + 0.5 * (float)Math.Cos((k - minTime) * Math.PI / (24 - maxTime + minTime))));
+                    tempProfile[k] = (float)(minTemp + (maxTemp - minTemp) * (0.5 + 0.5 *
+                        (float)Math.Cos(Math.PI + (k - 24 - minTime) * Math.PI / (24 - maxTime + minTime))));
+                    //tempProfile[k] = (float)(maxTemp - (maxTemp - minTemp) * (0.5 + 0.5 * (float)Math.Cos((k - minTime) * Math.PI / (24 - maxTime + minTime))));
+                    humidProfile[k] = (float)(maxHumid - (maxHumid - minHumid) * (0.5 + 0.5 * (float)Math.Cos((k - maxTime) * Math.PI / (24 - maxTime + minTime))));
                 }
             }
 
@@ -255,10 +271,11 @@ namespace RoxCaseGen
             this.year = "2022";                                                                     //date of starting data, doesnt really matter.
             this.month = "9";
             outputFile.Add($"CONDITIONING_PERIOD_END: {this.month} {this.totalRAWSdays} 2300");
-            outputFile.Add("FUEL_MOISTURES_DATA: 255");                                             //all the fuel moistures are the same and hardcoded below for now.
-            for (int i = 1; i < 256; i++)
+            outputFile.Add($"FUEL_MOISTURES_DATA: {this.fmc.GetLength(0)+1}");                                             //all the fuel moistures are the same and hardcoded below for now.
+            outputFile.Add("0 6 7 8 60 90");
+            for (int i = 0; i < this.fmc.GetLength(0); i++)
             {
-                outputFile.Add((i - 1).ToString() + $" {this.fuelMoisture[0]} {this.fuelMoisture[1]} {this.fuelMoisture[2]} {this.fuelMoisture[3]} {this.fuelMoisture[4]}");
+                outputFile.Add($"{this.fmc[i,0]} {this.fmc[i,1]} {this.fmc[i,2]} {this.fmc[i,3]} {this.fmc[i,4]} {this.fmc[i,5]}");
             }
             outputFile.Add("RAWS_ELEVATION: 10");                                               //random value added for now. Maybe it is too high?
             outputFile.Add("RAWS_UNITS: Metric");                                                 //All values declared metric
@@ -306,8 +323,9 @@ namespace RoxCaseGen
             {
                 outputFile.Add((i - 1).ToString() + $" {this.fuelMoisture[0]} {this.fuelMoisture[1]} {this.fuelMoisture[2]} {this.fuelMoisture[3]} {this.fuelMoisture[4]}");
             }
-            outputFile.Add("RAWS_ELEVATION: 190");                                               
-            outputFile.Add("RAWS_UNITS: Metric");                                                 //All values declared metric
+            outputFile.Add("RAWS_ELEVATION: 10");                                               
+            outputFile.Add("RAWS_UNITS: Metric"); 
+            outputFile.Add("WIND_SPEED_UNITS: 1"); //All values declared metric
             outputFile.Add($"RAWS: {(this.totalRAWSdays * 24).ToString()}");                   //Calculate and declare how many weather points will follow
             for (int i = 0; i < this.totalRAWSdays; i++)                                          //Output all the weather data in FARSITE flavor. Precipitation is defaulted to 20%
             {
@@ -328,8 +346,13 @@ namespace RoxCaseGen
 
             outputFile.Add("SPREADRATE:");
             outputFile.Add("MAXSPREADDIR:");
+            outputFile.Add("SOLARRADIATION:");
+            outputFile.Add("FUELMOISTURE1:");
+            outputFile.Add("FUELMOISTURE10:");
+            outputFile.Add("FUELMOISTURE100:");
+            outputFile.Add("FUELMOISTURE1000:");
 
-            File.WriteAllLines(Path + "ROX.input", outputFile.ToArray());
+            File.WriteAllLines(Path, outputFile.ToArray());
 
             //Console.WriteLine("Input File Created!");
         }
@@ -492,11 +515,11 @@ namespace RoxCaseGen
                 {
                     sw.WriteLine(header[i]);
                 }
-                for (int i = 0; i < boundary.GetLength(1); i++)   //for all elements in the output array
+                for (int i = 0; i < boundary.GetLength(0); i++)   //for all elements in the output array
                 {
-                    for (int j = 0; j < boundary.GetLength(0); j++)
+                    for (int j = 0; j < boundary.GetLength(1); j++)
                     {
-                        sw.Write(boundary[j, i] + " ");       //write the element in the file
+                        sw.Write(boundary[i, j] + " ");       //write the element in the file
                     }
                     sw.Write("\n");
                 }
@@ -512,11 +535,12 @@ namespace RoxCaseGen
                 {
                     sw.WriteLine(header[i]);
                 }
-                for (int i = 0; i < boundary.GetLength(1); i++)   //for all elements in the output array
+                for (int i = 0; i < boundary.GetLength(0); i++)   //for all elements in the output array
                 {
-                    for (int j = 0; j < boundary.GetLength(0); j++)
+                    for (int j = 0; j < boundary.GetLength(1); j++)
                     {
-                        sw.Write(boundary[j, i] + " ");       //write the element in the file
+                        int intOut = (boundary[i,j]<=0) ? -9999 : boundary[i, j];
+                        sw.Write(intOut + " ");       //write the element in the file
                     }
                     sw.Write("\n");
                 }
@@ -700,11 +724,46 @@ namespace RoxCaseGen
                 sw.WriteLine(output);
             }
         }
+        public float demo_CalcConvergence(int currentIteration, string Path)
+        {
+            float[,] previousOutput = readASC_float(Path + $"/Output/ProbabilisticTriggerBoundary.asc");
+            float[,] currentSF = readASC_float(Path + $"/Output/TriggerBoundary_{currentIteration}.asc");
 
+            float[,] currentOutput = new float[currentSF.GetLength(0), currentSF.GetLength(1)];
+
+            for (int i = 0;i<currentSF.GetLength(0); i++)
+            {
+                for (int j = 0; j<currentSF.GetLength(1); j++)
+                {
+                    if (previousOutput[i, j] < 0){previousOutput[i, j] = 0;}
+                    if (currentSF[i, j] < 0){currentSF[i, j] = 0;}
+                    currentOutput[i, j] = previousOutput[i, j] + currentSF[i, j];
+                }
+            }
+
+            // Initialize max value with the smallest possible float value
+            float maxPrev = previousOutput.Cast<float>().Max();
+            float maxCurr = currentOutput.Cast<float>().Max();
+
+            float maxError = 0;
+            int checkIntervals = 5;
+            for (int interval = 0; interval < checkIntervals; interval++)
+            {
+                float thresholdPrev = interval * maxPrev / checkIntervals;
+                float thresholdCurr = interval * maxCurr / checkIntervals;
+
+                int binaryPrev = previousOutput.Cast<float>().Count(value => value > thresholdPrev);
+                int binaryCurr = currentOutput.Cast<float>().Count(value => value > thresholdCurr);
+                float error = Math.Abs((float)(binaryCurr - binaryPrev)/binaryPrev);
+                if (error>maxError) { maxError = error; }
+            }
+
+            return maxError;
+        }
         public float CalcConvergence(int currentIteration, string Path, string model)
         {
-            float[,] previousOutput = readSafetyMatrix_float(Path + $"Outputs/SafetyMatrix_{model}.txt");
-            float[,] currentSF = readSafetyMatrix_float(Path + $"Outputs/SafetyMatrix_{model}_" + currentIteration.ToString() + ".txt");
+            float[,] previousOutput = readASC_float(Path + $"Outputs/SafetyMatrix_{model}.txt");
+            float[,] currentSF = readASC_float(Path + $"Outputs/SafetyMatrix_{model}_" + currentIteration.ToString() + ".txt");
 
             float[,] currentOutput = new float[currentSF.GetLength(0), currentSF.GetLength(1)];
 
@@ -879,6 +938,414 @@ namespace RoxCaseGen
                 javaProc.Kill();
             }
         }
+        public static (double mag, double dir) CalculateGradient(float[,] matrix, int row, int col, float cellsize)
+        {
+            int numRows = matrix.GetLength(0);
+            int numCols = matrix.GetLength(1);
+
+            // Ensure the point is within the bounds of the matrix
+            if (row <= 0 || row >= numRows - 1 || col <= 0 || col >= numCols - 1)
+                throw new ArgumentException("The point must not be on the boundary of the matrix.");
+
+            // Compute partial derivatives using central differences
+            double dx = matrix[row, col + 1] - matrix[row, col - 1]; // Horizontal
+            double dy = matrix[row + 1, col] - matrix[row - 1, col]; // Vertical
+
+            double magnitude = (2 * cellsize) / Math.Sqrt(dx * dx + dy * dy);
+
+            // Calculate direction (in degrees)
+            double thetaHorizontal = ((Math.Atan2(dy, dx) * (180.0 / Math.PI)) - 90) % 360;
+            double direction = 180 + thetaHorizontal;
+            if (direction < 0) direction += 360;
+
+            return (magnitude, direction);
+        }
+        /// <summary>
+        /// Transposes a 2D matrix.
+        /// </summary>
+        /// <param name="matrix">The input matrix to transpose.</param>
+        /// <returns>A new matrix that is the transpose of the input matrix.</returns>
+        public static float[,] TransposeMatrix(float[,] matrix)
+        {
+            int rows = matrix.GetLength(0);
+            int cols = matrix.GetLength(1);
+
+            float[,] transposed = new float[cols, rows];
+
+            for (int i = 0; i < rows; i++)
+            {
+                for (int j = 0; j < cols; j++)
+                {
+                    transposed[j, i] = matrix[i, j];
+                }
+            }
+
+            return transposed;
+        }
+        
+        public static int[,] TransposeMatrix(int[,] matrix)
+        {
+            int rows = matrix.GetLength(0);
+            int cols = matrix.GetLength(1);
+
+            int[,] transposed = new int[cols, rows];
+
+            for (int i = 0; i < rows; i++)
+            {
+                for (int j = 0; j < cols; j++)
+                {
+                    transposed[j, i] = matrix[i, j];
+                }
+            }
+
+            return transposed;
+        }
+
+        public int[] InitialiseIterationAndGetIgnition(string path)
+        {
+            int[] coordinates = SelectIgnitionPoint(path + "/Farsite/Input/", false); //choose ignition coordinates
+            randomizeValues(); //randomise the weather and wind values
+            saveUsedData(path); //dump the selected variables in log.txt
+            createTempAndHumidProfile(); //extrapolate diurnal temperature and humidity profiles
+            return coordinates;
+        }
+
+        public void GetFMC(string path)
+        {
+            createAndWriteFileFLAMMAP(path + "/Farsite/inputFLAMMAP.input");
+            RunModels.runCommand([$"cd '{path}Farsite'", $"./setenv.bat", "./bin/testFLAMMAP.exe FLAMMAP.txt"],
+                @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",";");
+            
+            while(!File.Exists(path + "Farsite/Median_Outputs/FLAMMAP_FUELMOISTURE1.asc")){Thread.Sleep(200);}
+
+            int[] fuelsPresent = this.fuelMap
+                .Cast<int>()
+                .Where(fuel => fuel != -9999) // exclude -9999
+                .Distinct()
+                .ToArray();
+            float[,]fuelMoistures = new float[fuelsPresent.Length,4];
+
+            int[,] fuelmap13 = readASC_int(path + "Input/FDS LS1/Input/fuel13.asc");
+            int[] fuelsPresent13 = fuelmap13
+                .Cast<int>()
+                .Where(fuel => fuel != -9999) // exclude -9999
+                .Distinct()
+                .ToArray();
+            float[,]fuelMoistures13 = new float[fuelsPresent13.Length,4];
+            
+            float[,] hour1fmc = readASC_float(path + @"Farsite/Median_Outputs/FLAMMAP_FUELMOISTURE1.asc");
+            float[,] hour10fmc = readASC_float(path + @"Farsite/Median_Outputs/FLAMMAP_FUELMOISTURE10.asc");
+            float[,] hour100fmc = readASC_float(path + @"Farsite/Median_Outputs/FLAMMAP_FUELMOISTURE100.asc");
+
+            for (int i = 0; i < this.fuelMap.GetLength(0); i++)
+            {
+                for (int j = 0; j < this.fuelMap.GetLength(1); j++)
+                {
+                    if (hour1fmc[i, j] > 0 && hour10fmc[i, j] > 0 && hour100fmc[i, j] > 0 && fuelmap13[i,j] > 0)
+                    {
+                        int loc = Array.IndexOf(fuelsPresent,this.fuelMap[i, j]);
+                        fuelMoistures[loc,0] ++;
+                        fuelMoistures[loc,1] += hour1fmc[i,j];
+                        fuelMoistures[loc,2] += hour10fmc[i,j];
+                        fuelMoistures[loc,3] += hour100fmc[i,j];
+                    
+                        int loc2 = Array.IndexOf(fuelsPresent13,fuelmap13[i, j]);
+                        fuelMoistures13[loc2,0] ++;
+                        fuelMoistures13[loc2,1] += hour1fmc[i,j];
+                        fuelMoistures13[loc2,2] += hour10fmc[i,j];
+                        fuelMoistures13[loc2,3] += hour100fmc[i,j];
+                    } 
+                }
+            }
+            
+            int[,] fmcOut = new int [fuelsPresent.Length,6];
+            for (int i = 0; i < fmcOut.GetLength(0); i++)
+            {
+                fmcOut[i, 0] = fuelsPresent[i];
+                fmcOut[i, 1] = (int)(100 * fuelMoistures[i, 1] / fuelMoistures[i, 0]);
+                fmcOut[i, 2] = (int)(100 * fuelMoistures[i, 2] / fuelMoistures[i, 0]);
+                fmcOut[i, 3] = (int)(100 * fuelMoistures[i, 3] / fuelMoistures[i, 0]);
+                fmcOut[i, 4] = 60;
+                fmcOut[i, 5] = 90;
+            }
+            //remmeber to alter the FMC creation function
+            
+            this.fmc = fmcOut;
+            
+            int[,] fmcOut13 = new int [fuelsPresent.Length,6];
+            for (int i = 0; i < fmcOut.GetLength(0); i++)
+            {
+                fmcOut13[i, 0] = fuelsPresent13[i];
+                fmcOut13[i, 1] = (int)(100 * fuelMoistures13[i, 1] / fuelMoistures13[i, 0]);
+                fmcOut13[i, 2] = (int)(100 * fuelMoistures13[i, 2] / fuelMoistures13[i, 0]);
+                fmcOut13[i, 3] = (int)(100 * fuelMoistures13[i, 3] / fuelMoistures13[i, 0]);
+                fmcOut13[i, 4] = 60;
+                fmcOut13[i, 5] = 90;
+            }
+            //remmeber to alter the FMC creation function
+            
+            this.fmc_A13 = fmcOut13;
+        }
+        
+        public static void CreateMultiBandGeoTiff(
+        float[,] rasterData2D,    // or short[,] if using Int16
+        int numberOfBands,
+        string outputFilename,
+        string sampleGeoTiff,
+        DataType gdalDataType)
+        {
+            // 1. Open the "sample" GeoTIFF to get CRS and GeoTransform
+            using (Dataset sampleDs = Gdal.Open(sampleGeoTiff, Access.GA_ReadOnly))
+            {
+                if (sampleDs == null)
+                {
+                    throw new Exception($"Could not open sample GeoTIFF: {sampleGeoTiff}");
+                }
+
+                // Get projection (CRS) in WKT
+                string wktProjection = sampleDs.GetProjection();
+
+                // Get GeoTransform
+                double[] sampleGeoTransform = new double[6];
+                sampleDs.GetGeoTransform(sampleGeoTransform);
+            }
+
+            // At this point, sampleDs is out of scope if we used 'using(...)'.
+            // We can re-open or store the relevant info outside the using block:
+            double[] geoTransform;
+            string projWkt;
+
+            // Let's store them before disposing sampleDs:
+            {
+                // We'll open again (or do the logic in a single block):
+                using (var sampleDs = Gdal.Open(sampleGeoTiff, Access.GA_ReadOnly))
+                {
+                    geoTransform = new double[6];
+                    sampleDs.GetGeoTransform(geoTransform);
+                    projWkt = sampleDs.GetProjection();
+                }
+            }
+
+            // 2. Retrieve the dimensions from the 2D array
+            int height = rasterData2D.GetLength(0);
+            int width  = rasterData2D.GetLength(1);
+
+            // 3. Prepare to create the new GeoTIFF
+            GDAL_Driver gtiffDriver = Gdal.GetDriverByName("GTiff");
+            if (gtiffDriver == null)
+            {
+                throw new Exception("Could not get GTiff driver. Is GDAL properly installed?");
+            }
+
+            // Example creation options (optional)
+            string[] creationOptions = new string[]
+            {
+                "COMPRESS=LZW",
+                "TILED=YES"
+            };
+
+            // 4. Create the output dataset
+            using (Dataset outDs = gtiffDriver.Create(
+                outputFilename,
+                width,
+                height,
+                numberOfBands,
+                gdalDataType,
+                creationOptions))
+            {
+                if (outDs == null)
+                {
+                    throw new Exception("Could not create output GeoTIFF dataset.");
+                }
+
+                // Set projection and geo-transform from the sample
+                outDs.SetProjection(projWkt);
+                outDs.SetGeoTransform(geoTransform);
+
+                // 5. Flatten the 2D array for writing to each band
+                // We'll write the SAME data to every band.
+                float[] flatArray = new float[width * height];
+                int index = 0;
+
+                for (int row = 0; row < height; row++)
+                {
+                    for (int col = 0; col < width; col++)
+                    {
+                        flatArray[index] = rasterData2D[row, col];
+                        index++;
+                    }
+                }
+
+                // 6. Write data to each band
+                for (int b = 1; b <= numberOfBands; b++)
+                {
+                    Band band = outDs.GetRasterBand(b);
+                    band.SetNoDataValue(-9999);
+                    if (band == null)
+                    {
+                        throw new Exception($"Could not get raster band {b} from output dataset.");
+                    }
+
+                    band.WriteRaster(
+                        0, 0,              // offset in the output dataset
+                        width, height,     // size to write
+                        flatArray,         // buffer
+                        width, height,     // buffer dimensions
+                        0, 0               // pixel spacing
+                    );
+
+                    band.FlushCache();
+                }
+
+                // 7. Done
+                outDs.FlushCache();
+            }
+            Console.WriteLine($"Created multi-band GeoTIFF: {outputFilename}");
+        }
+        public static int FindHighestCommonX(string folderPath, IEnumerable<string> modelNames)
+        {
+            // Convert modelNames to a list to avoid multiple enumerations
+            var modelList = modelNames.ToList();
+
+            // Dictionary: modelName -> set of X values
+            var xValuesByModel = new Dictionary<string, HashSet<int>>();
+
+            // Initialize dictionary with empty sets for each model
+            foreach (var model in modelList)
+            {
+                xValuesByModel[model] = new HashSet<int>();
+            }
+
+            // Get all files in the specified folder (adjust the search pattern as needed)
+            var files = Directory.GetFiles(folderPath, "SafetyMatrix_*_*.*");
+
+            // Parse each file name
+            foreach (var filePath in files)
+            {
+                var fileName = Path.GetFileNameWithoutExtension(filePath);
+                var parts = fileName.Split('_');
+            
+                // We expect three parts: "SafetyMatrix", <modelName>, <X>
+                if (parts.Length < 3) 
+                    continue; // Not matching our expected pattern, skip
+
+                var possibleModel = parts[1];
+                if (!xValuesByModel.ContainsKey(possibleModel))
+                    continue; // This file's modelName isn't in our list
+
+                if (int.TryParse(parts[2], out int x))
+                {
+                    xValuesByModel[possibleModel].Add(x);
+                }
+            }
+
+            // Intersect the sets to find X values common to all models
+            // Start from the first model's set of X values
+            var commonXs = new HashSet<int>(xValuesByModel[modelList[0]]);
+
+            // Intersect with each subsequent model's set
+            foreach (var model in modelList.Skip(1))
+            {
+                commonXs.IntersectWith(xValuesByModel[model]);
+            }
+
+            // If no common X exists, return -1
+            if (commonXs.Count == 0)
+                return -1;
+
+            // Otherwise, return the maximum common X
+            return commonXs.Max();
+        }
+
+        public static void wuiPointsToShapefile(int[,] wuiIn, float cellsize, string[] header, int[] rasterDims, string sourcePRJ, string shpFilePath)
+        {
+            // 1. Register all GDAL/OGR drivers
+            Gdal.AllRegister();   // This registers both raster (GDAL) and vector (OGR) drivers
+
+            string[] xllParts = header[2].Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            string[] yllParts = header[3].Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            
+            // Parse the values as float (or double, if you prefer)
+            float xll = float.Parse(xllParts[1], CultureInfo.InvariantCulture);
+            float yll = float.Parse(yllParts[1], CultureInfo.InvariantCulture);
+            
+            // Note: For a proper polygon, first and last point should match or we call ring.CloseRings().
+            List<(float,float)> polygonPoints = new List<(float,float)>();
+            for (int i = 0; i < wuiIn.GetLength(0); i++)
+            {
+                polygonPoints.Add((xll + cellsize * (wuiIn[i, 0]),yll + cellsize * (rasterDims[1] - wuiIn[i, 1])));
+            }
+
+            // 3. Get the ESRI Shapefile driver
+            var shpDriver = Ogr.GetDriverByName("ESRI Shapefile");
+            if (shpDriver == null)
+            {
+                Console.WriteLine("Cannot get 'ESRI Shapefile' driver. Is GDAL/OGR installed properly?");
+                return;
+            }
+
+            // 4. If the file exists, delete it
+            if (File.Exists(shpFilePath)) 
+            {
+                shpDriver.DeleteDataSource(shpFilePath);
+            }
+
+            // 5. Create the new shapefile (DataSource)
+            DataSource dataSource = shpDriver.CreateDataSource(shpFilePath, null);
+            if (dataSource == null)
+            {
+                Console.WriteLine("Could not create shapefile.");
+                return;
+            }
+
+            // 6. (Optional) Set a Spatial Reference. For example, EPSG:4326
+            SpatialReference srs = new SpatialReference("");
+            string wktPrj = File.ReadAllText(sourcePRJ);
+            SpatialReference sr = new SpatialReference("");
+            sr.ImportFromWkt(ref wktPrj);
+
+            // 7. Create a layer of polygon geometry
+            Layer layer = dataSource.CreateLayer("layerName", srs, wkbGeometryType.wkbPolygon, null);
+            if (layer == null)
+            {
+                Console.WriteLine("Could not create layer in shapefile.");
+                return;
+            }
+
+            // 8. Create a field definition (attribute column)
+            FieldDefn idField = new FieldDefn("ID", FieldType.OFTInteger);
+            layer.CreateField(idField, 1);
+
+            // 9. Build a polygon geometry from the list of points
+            OSGeo.OGR.Geometry ring = new OSGeo.OGR.Geometry(wkbGeometryType.wkbLinearRing);
+            foreach (var (x, y) in polygonPoints)
+            {
+                ring.AddPoint_2D(x, y);
+            }
+            // Optionally ensure the ring is closed
+            ring.CloseRings();
+
+            // Create a polygon from the ring
+            OSGeo.OGR.Geometry polygon = new OSGeo.OGR.Geometry(wkbGeometryType.wkbPolygon);
+            polygon.AddGeometry(ring);
+
+            // 10. Create a feature, set its geometry and attribute(s)
+            OSGeo.OGR.FeatureDefn layerDefn = layer.GetLayerDefn();
+            OSGeo.OGR.Feature feature = new OSGeo.OGR.Feature(layerDefn);
+
+            feature.SetField("ID", 1);
+            feature.SetGeometry(polygon);
+
+            // 11. Add the feature to the layer
+            layer.CreateFeature(feature);
+
+            // 12. Cleanup
+            feature.Dispose();
+            dataSource.FlushCache();
+            dataSource.Dispose();
+
+            Console.WriteLine($"Shapefile created: {shpFilePath}");
+        }
     }
     class Vector
     {
@@ -914,6 +1381,21 @@ namespace RoxCaseGen
             double newY = v1.Y + v2.Y;
             return new Vector(newX, newY);
         }
+        
+        public static Vector Max(List<Vector> vectors)
+        {
+            double max = float.MinValue;
+            int maxIndex = -1;
+            for (int i = 0; i < vectors.Count; i++)
+            {
+                if (vectors[i].Magnitude > max)
+                {
+                    max=vectors[i].Magnitude;
+                    maxIndex = i;
+                }
+            }
+            return vectors[maxIndex];
+        }
 
         // Add a set of vectors
         public static Vector Add(IEnumerable<Vector> vectors)
@@ -922,12 +1404,7 @@ namespace RoxCaseGen
             double totalY = vectors.Sum(v => v.Y);
             return new Vector(totalX, totalY);
         }
-
-        // Override ToString for easy display
-        public override string ToString()
-        {
-            return $"Vector(X: {X}, Y: {Y}, Magnitude: {Magnitude:F2}, Direction: {Direction:F2}°)";
-        }
+        
     }
     public class createShapefile
     {

@@ -3,12 +3,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using NetTopologySuite.Noding;
 using System.Text;
+using OSGeo.GDAL;
 
 namespace RoxCaseGen
 {
@@ -186,13 +188,8 @@ namespace RoxCaseGen
             }
         }
 
-        public static void setupFarsiteIteration(string path, ModelSetup please)
+        public static void setupFarsiteIteration(string path, int[] coordinates, ModelSetup please)
         {
-            int[] coordinates = please.SelectIgnitionPoint(path, false); //choose ignition coordinates
-            please.randomizeValues(); //randomise the weather and wind values
-            please.saveUsedData(path); //dump the selected variables in log.txt
-            please.createTempAndHumidProfile(); //extrapolate diurnal temperature and humidity profiles
-
             please.createAndWriteFileFARSITE(path); //create the FARSITE input file
 
             createShapefile.createAndWriteShapefile(coordinates[0], coordinates[1],
@@ -282,6 +279,7 @@ namespace RoxCaseGen
 
                     break;
                 case "ELMFIRE":
+                    /*
                     string[,] output = new string[please.burnDuration + 1, 7];
                     output[0, 0] = "ws";
                     output[0, 1] = "wd";
@@ -317,7 +315,32 @@ namespace RoxCaseGen
                             writer.Write(string.Join(",", row) + "\n");
                         }
                     }
-
+                    */
+                    string gdalDataPath ="C:\\Users\\nikos\\.nuget\\packages\\maxrev.gdal.core\\3.10.0.306\\runtimes\\any\\native\\gdal-data";
+                    Environment.SetEnvironmentVariable ("GDAL_DATA", gdalDataPath);
+                    Gdal.SetConfigOption ("GDAL_DATA", gdalDataPath);
+                    string gdalSharePath = "C:/Users/nikos/.nuget/packages/gdal.native/3.10.0/build/gdal/share/";
+                    Environment.SetEnvironmentVariable ("PROJ_LIB", gdalSharePath);
+                    Gdal.SetConfigOption("PROJ_LIB", gdalSharePath);
+                    Gdal.AllRegister();
+                    ModelSetup.CreateMultiBandGeoTiff(ModelSetup.readASC_float($"{path}/Farsite/Median_Outputs/FLAMMAP_FUELMOISTURE1.asc"),please.burnDuration,$"{path}/ELMFIRE/input/m1.tif",$"{path}/ELMFIRE/input/dem.tif",DataType.GDT_Float32);
+                    ModelSetup.CreateMultiBandGeoTiff(ModelSetup.readASC_float($"{path}/Farsite/Median_Outputs/FLAMMAP_FUELMOISTURE10.asc"),please.burnDuration,$"{path}/ELMFIRE/input/m10.tif",$"{path}/ELMFIRE/input/dem.tif",DataType.GDT_Float32);
+                    ModelSetup.CreateMultiBandGeoTiff(ModelSetup.readASC_float($"{path}/Farsite/Median_Outputs/FLAMMAP_FUELMOISTURE100.asc"),please.burnDuration,$"{path}/ELMFIRE/input/m100.tif",$"{path}/ELMFIRE/input/dem.tif",DataType.GDT_Float32);
+                    float[,] matrix = new float[please.fuelMap.GetLength(0), please.fuelMap.GetLength(1)];
+                    float[] outputValues = [please.fuelMoisture[3],please.fuelMoisture[4],please.windMag,please.windDir];
+                    string[] outputNames = ["lh", "lw", "ws", "wd"];
+                    for (int i = 0; i < outputValues.GetLength(0); i++)
+                    {
+                        for (int r = 0; r < please.fuelMap.GetLength(0); r++)
+                        {
+                            for (int c = 0; c < please.fuelMap.GetLength(1); c++)
+                            {
+                                matrix[r, c] = outputValues[i];
+                            }
+                        }
+                        ModelSetup.CreateMultiBandGeoTiff(matrix,please.burnDuration,$"{path}/ELMFIRE/input/{outputNames[i]}.tif",$"{path}/ELMFIRE/input/dem.tif",DataType.GDT_Float32);
+                    }
+                    
                     string text = File.ReadAllText(path + @"ELMFIRE/run.sh");
                     text = text.Replace("SIMULATION_TSTOP=32400.0", $"SIMULATION_TSTOP={please.burnDuration * 3600}");
                     text = text.Replace("WX_READINGS=10", $"WX_READINGS={please.burnDuration}");
@@ -327,25 +350,23 @@ namespace RoxCaseGen
 
                     ModelSetup.Copy(path + "ELMFIRE/",
                         @"\\wsl.localhost\\Ubuntu-22.04\\home\\nikosuser\\ELMFIRE\\elmfire\\tutorials\\kPERIL\");
+                    
                     break;
                 case "EPD":
                 case "LSTM":
 
                     List<string> wxsOutput = new List<string>();
                     List<string> fmsOutput = new List<string>();
-                    for (int i = 1; i < 256; i++)
+                    for (int i = 1; i < please.fmc.GetLength(0); i++)
                     {
-                        fmsOutput.Add((i - 1).ToString() +
-                                      $" {please.fuelMoisture[0]} {please.fuelMoisture[1]} {please.fuelMoisture[2]} {please.fuelMoisture[3]} {please.fuelMoisture[4]}");
+                        fmsOutput.Add($" {please.fmc[i,0]} {please.fmc[i,1]} {please.fmc[i,2]} {please.fmc[i,3]} {please.fmc[i,4]} {please.fmc[i,5]}");
                     }
 
                     wxsOutput.Add("RAWS_ELEVATION: 10"); //random value added for now. Maybe it is too high?
                     wxsOutput.Add("RAWS_UNITS: Metric"); //All values declared metric
                     wxsOutput.Add(
                         $"RAWS: {(please.totalRAWSdays * 24).ToString()}"); //Calculate and declare how many weather points will follow
-                    for (int i = 0;
-                         i < please.totalRAWSdays;
-                         i++) //Output all the weather data in FARSITE flavor. Precipitation is defaulted to 20%
+                    for (int i = 0; i < please.totalRAWSdays; i++)
                     {
                         for (int j = 0; j < 24; j++)
                         {
@@ -385,7 +406,7 @@ namespace RoxCaseGen
 
                     string addCRStoPointCommand =
                         @$" run native:reprojectlayer --distance_units=meters --area_units=m2 --ellipsoid=EPSG:7043 --INPUT='{path}/Farsite/Input/ROX.shp' --TARGET_CRS='EPSG:32235' --CONVERT_CURVED_GEOMETRIES=false --OPERATION= --OUTPUT='{path}/{model}/Input/ignition.shp'";
-                    string qgisProcessorPromptPath = @"C:\Program Files\QGIS 3.34.13\bin/";
+                    string qgisProcessorPromptPath = @"C:\Program Files\QGIS 3.34.11\bin/";
                     string[] commandsPoint = new string[]
                     {
                         $"cd '{qgisProcessorPromptPath}'",
@@ -435,10 +456,10 @@ namespace RoxCaseGen
                     fdstext = fdstext.Replace("      LEVEL_SET_MODE=1 ", $"      LEVEL_SET_MODE={lsmode} ");
                     fdstext = fdstext.Replace("&WIND SPEED=1., RAMP_SPEED_T='ws', RAMP_DIRECTION_T='wd' /", $"&WIND SPEED=1., RAMP_SPEED='ws', RAMP_DIRECTION='wd' /");
                     fdstext = fdstext.Replace("&TIME T_END=0. /", $"&TIME T_END={please.burnDuration * 3600} /");
-                    for (int i = 0; i < 11; i++)
+                    for (int i = 0; i < please.fmc_A13.GetLength(0); i++)
                     {
-                        fdstext = fdstext.Replace($"VEG_LSET_FUEL_INDEX={i + 1} /",
-                            $"VEG_LSET_FUEL_INDEX={i + 1}, VEG_LSET_M1={(please.fuelMoisture[0] / 100).ToString("F")}, VEG_LSET_M10={(please.fuelMoisture[1] / 100).ToString("F")}, VEG_LSET_M100={(please.fuelMoisture[2] / 100).ToString("F")}, VEG_LSET_MLW={(please.fuelMoisture[3] / 100).ToString("F")}, VEG_LSET_MLH={(please.fuelMoisture[4] / 100).ToString("F")} /");
+                        fdstext = fdstext.Replace($"VEG_LSET_FUEL_INDEX={please.fmc_A13[i,0].ToString()} /",
+                            $"VEG_LSET_FUEL_INDEX={please.fmc_A13[i,0].ToString()}, VEG_LSET_M1={(please.fmc_A13[i,1] / 100).ToString("F")}, VEG_LSET_M10={(please.fmc_A13[i,2] / 100).ToString("F")}, VEG_LSET_M100={(please.fmc_A13[i,3] / 100).ToString("F")}, VEG_LSET_MLW={(please.fmc_A13[i,4] / 100).ToString("F")}, VEG_LSET_MLH={(please.fmc_A13[i,5] / 100).ToString("F")} /");
                     }
 
                     File.WriteAllText(filePath, fdstext);
@@ -480,6 +501,7 @@ namespace RoxCaseGen
                     {
                         Console.WriteLine("Target line not found!");
                     }
+                    Thread.Sleep(1000);
                     break;
             }
         }
@@ -495,7 +517,13 @@ namespace RoxCaseGen
                         @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",";");
                     break;
                 case "WISE":
-                    
+                    string gdalDataPath ="C:\\Program Files\\Prometheus\\gdal-data\\";
+                    Environment.SetEnvironmentVariable ("GDAL_DATA", gdalDataPath);
+                    Gdal.SetConfigOption ("GDAL_DATA", gdalDataPath);
+                    string gdalSharePath = "C:\\Program Files\\Prometheus\\proj_nad\\";
+                    Environment.SetEnvironmentVariable ("PROJ_LIB", gdalSharePath);
+                    Gdal.SetConfigOption("PROJ_LIB", gdalSharePath);
+                    Gdal.AllRegister();
                     Console.WriteLine("Starting WISE Manager");
                     ProcessStartInfo startInfoManager = new ProcessStartInfo(@"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe", @"cd C:\WISE_Manager-0.6.beta.5; java -jar WISE_Manager_Ui.jar")
                     {
@@ -778,7 +806,7 @@ mpirun fds $HOME/peril/Iter{simNo.ToString("000")}/mati.fds";
                         }
                     }
 
-                    float[,] output_temp = ModelSetup.readTiff(Path.Combine(destinationFolder, ELMoutputname + ".tif"));
+                    float[,] output_elmfire = ModelSetup.readTiff(Path.Combine(destinationFolder, ELMoutputname + ".tif"));
 
                     if (outputKind == "Azimuth")
                     {
@@ -787,46 +815,44 @@ mpirun fds $HOME/peril/Iter{simNo.ToString("000")}/mati.fds";
                         {
                             for (int j = 0; j < output.GetLength(1); j++)
                             {
-                                if (i == 0)
+                                if (output_elmfire[i, j] < 0)
                                 {
-                                    output[i, j] = 0;
+                                    output[i, j] = -9999;
+                                }
+                                else if (i == 0)
+                                {
+                                    output[i, j] = -9999;
                                 }
                                 else if (i == output.GetLength(0) - 1)
                                 {
-                                    output[i, j] = 0;
+                                    output[i, j] = -9999;
                                 }
                                 else if (j == 0)
                                 {
-                                    output[i, j] = 0;
+                                    output[i, j] = -9999;
                                 }
                                 else if (j == output.GetLength(1) - 1)
                                 {
-                                    output[i, j] = 0;
+                                    output[i, j] = -9999;
                                 }
                                 else
                                 {
-                                    List<Vector> vectors = new List<Vector>
-                                    {
-                                        Vector.FromPolar(output_temp[i + 1, j], 0),
-                                        Vector.FromPolar(output_temp[i + 1, j + 1], 45),
-                                        Vector.FromPolar(output_temp[i, j + 1], 90),
-                                        Vector.FromPolar(output_temp[i - 1, j + 1], 135),
-                                        Vector.FromPolar(output_temp[i - 1, j], 180),
-                                        Vector.FromPolar(output_temp[i - 1, j - 1], 225),
-                                        Vector.FromPolar(output_temp[i, j - 1], 270),
-                                        Vector.FromPolar(output_temp[i + 1, j - 1], 315),
-                                    };
-                                    Vector resultantVector = Vector.Add(vectors);
-                                    output[i, j] = (float)resultantVector.Direction;
+                                    var ros = ModelSetup.CalculateGradient(output_elmfire, i, j, please.cellsize);
+                                    output[i, j] = (float)ros.dir;
                                 }
                             }
                         }
                     }
                     else
                     {
-                        output = output_temp;
+                        for (int i = 0; i < output_elmfire.GetLength(0); i++)
+                        {
+                            for (int j = 0; j < output_elmfire.GetLength(1); j++)
+                            {
+                                output[i, j] = output_elmfire[i, j] / 3.281f;
+                            }
+                        }
                     }
-
                     break;
                 case "EPD":
                 case "LSTM":
@@ -840,47 +866,36 @@ mpirun fds $HOME/peril/Iter{simNo.ToString("000")}/mati.fds";
                     float[,] output_EPD = ModelSetup.readASC_float(googlePath + model + "_AT_OS.asc");
 
                     Console.WriteLine($"Google: Converting Arrival Time to ROS ... ");
-                    for (int i = 0; i < output.GetLength(0); i++)
+                    for (int j = 0; j < output.GetLength(0); j++)
                     {
-                        for (int j = 0; j < output.GetLength(1); j++)
+                        for (int i = 0; i < output.GetLength(1); i++)
                         {
                             if ((int)output_EPD[i,j] == -9999)
                             {
-                                output[i, j] = 0;
+                                output[i, j] = -9999;
                             }
                             else if (i == 0)
                             {
-                                output[i, j] = 0;
+                                output[i, j] = -9999;
                             }
                             else if (i == output.GetLength(0) - 1)
                             {
-                                output[i, j] = 0;
+                                output[i, j] = -9999;
                             }
                             else if (j == 0)
                             {
-                                output[i, j] = 0;
+                                output[i, j] = -9999;
                             }
                             else if (j == output.GetLength(1) - 1)
                             {
-                                output[i, j] = 0;
+                                output[i, j] = -9999;
                             }
                             else
                             {
-                                List<Vector> vectors = new List<Vector>
-                                {
-                                    Vector.FromPolar(output_EPD[i + 1, j], 0),
-                                    Vector.FromPolar(output_EPD[i + 1, j + 1], 45),
-                                    Vector.FromPolar(output_EPD[i, j + 1], 90),
-                                    Vector.FromPolar(output_EPD[i - 1, j + 1], 135),
-                                    Vector.FromPolar(output_EPD[i - 1, j], 180),
-                                    Vector.FromPolar(output_EPD[i - 1, j - 1], 225),
-                                    Vector.FromPolar(output_EPD[i, j - 1], 270),
-                                    Vector.FromPolar(output_EPD[i + 1, j - 1], 315),
-                                };
-                                Vector resultantVector = Vector.Add(vectors);
+                                var ros = ModelSetup.CalculateGradient(output_EPD, i, j, please.cellsize);
                                 output[i, j] = (outputKind == "ROS")
-                                    ? (float)(please.cellsize / resultantVector.Magnitude)
-                                    : (float)resultantVector.Direction + 180;
+                                    ? (float)ros.mag
+                                    : (float)ros.dir;
                             }
                         }
                     }
@@ -965,8 +980,12 @@ mpirun fds $HOME/peril/Iter{simNo.ToString("000")}/mati.fds";
 
             foreach (string file in necessaryFiles)
             {
+                // Remove any leading slash before splitting
+                string[] parts = path.TrimStart('/').Split('/');
+                // The first part should be the root folder
+                string rootFolder = parts.Length > 0 ? parts[0] : string.Empty;
                 if (File.Exists(path + "/" + file))
-                    File.Copy(path + "/" + file, path + "Log/" + simNo.ToString("000_") + Path.GetFileName(file), true);
+                    File.Copy(path + "/" + file, $"{path}/Log/{simNo.ToString("000")}_{Path.GetFileName(file)}", true);
             }
         }
     }

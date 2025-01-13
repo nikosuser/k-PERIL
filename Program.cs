@@ -18,103 +18,7 @@
  * 
  * #######################################################################
  * 
- * WHAT IT DOES
- * 
- * k-PERIL is a program that can create trigger boundaries for any target area. 
- * Trigger boundaries are lines surrounding urban areas that are threatened 
- * by a wildfire. For a given Available Safe Egress Time (ASET) / Evacuation
- * time  of that area, the boundary is made so that, when the fire reaches
- * it, it will take an ASET amount of time to become a threat to the urban 
- * area. As such, when the fire reaches the trigger boundary, decision makers/
- * emergency responders should trigger evacuation so there is enough time 
- * for a full evacuation.
- * 
- * In particular, this program is a testing suite for the k-PERIL algorithm, which 
- * calculates the safety boundary around an urban area for a single wildfire.
- * However, the algorithm has been made so that it can also run a 
- * probabilistic simulation, for any number of plausible/theorised wildfires.
- * The lump sum of all the generated boundaries, for any number of input 
- * wildfires, is the probabilistic trigger boundary. 
- * 
- * One could in theory simulate all the fires they want to investigate
- * in software like FARSITE, Prometheus etc. and then make a small program
- * themselves using k-PERIL to calculate the trigger boundaries. For more
- * specialised cases, or for very particular fire conditions, or if input
- * data is very analytically given, this is a viable solution. In most cases,
- * accurate input data (moisture, wind, temperature, ignition source etc.) are
- * impossible to predict or even tabulate. As such, this program is made to take in
- * average values of environmental conditions, and use them to create 
- * a number of random values. 
- * 
- * Each environmental parameter (Max and Min Temperature, Humidity, Time
- * thereof, wind magnitude) are specified with an average value and 
- * standard deviation. Each simulation uses values randomly generated, 
- * following a normal distribution from the above values. Wind direction
- * always points to the center of the raster, to ensure a uniform fire 
- * coverage / a fire that covers the whole raster. Fuel Humidity values
- * are taken as uniform (and currently hardcoded) since it is near 
- * impossible to obtain. 
- * 
- * Weather data are extrapolated to a diurnal cycle based on the maximum
- * and minimum values. 
- * 
- * Once all the data is selected and saved, this program runs a command-line version
- * of FARSITE or Flammap that will solve the set fire simulation case, creating 
- * (among other things) two ROS data rasters. Those are then read by 
- * k-PERIL and it creates a boundary for this specified fire. This repeats
- * for as many time (hardcoded right now) as needed, and in the end the code
- * will output a raster where each cell represents how many times each 
- * point was inside a safety matrix. 
- * 
- * #######################################################################
- * 
- * HOW IT WORKS
- * 
- * RCG is made to take in a few files in the input folder:
- * 
- * >VARS.txt: this file contains all the input parameters of the simulation:
-
-                Currently all the units for the above are in metric, ASET is in minutes, 
-                var... values indicate standard deviations, and urban1x and urban1y indicate 
-                the X and Y values of the first urban node (X and Y values in relation to 
-                the raster size, with 0,0 being the top left corner of the raster, and 1,0 being the next adjacent cell. 
-                increasing with +X and -Y. English values are not yet supported.
-
-                When specifying Urban nodes, inly include the edges of the polygon that
-                encompasses your target urban area. k-PERIL can then calculate and use
-                all the nodes that are inside the polygon whose corners you specified. 
-
-    >INPUT.lcp and INPUT.prj: The landscape and projection files of the area
-you want to work on. 
-
-    >FUELTEMPLATE.asc (optionally also FUELTEMPLATE.prj): the isolated fuel 
-layer of INPUT.lcp. This is so that the simulation can avoid nonfuel ignition
-points and cause an error. 
-
-#######################################################################
-
-SPECIAL FEATURES:
-
-> Each simulation's input values are saved to a log.txt file in the main
-directory. You can then use it to plot the used variables and see or
-explain that they follow a normal distribution. It is also useful
-for debugging purposes. All the rate of spread magnitude matrices are also
-saved for debugging and analysis purposes.
-
-#######################################################################
-
-CHANGE LOG
-
-1.0: Release
-
-#######################################################################
-
-Known Bugs / Issues
-
-
-#######################################################################
-
-*/
+ */
 
 using System;
 using System.Collections.Generic;
@@ -126,6 +30,9 @@ using System.Diagnostics;
 using System.Data;
 using System.Drawing;
 using System.Threading;
+using MaxRev.Gdal.Core;
+using OSGeo.GDAL;
+
 
 namespace RoxCaseGen
 {
@@ -133,7 +40,18 @@ namespace RoxCaseGen
     {
         static void Main(string[] args)
         {
+            //Main_source([]);
+            Main_demo();
+        }
+        static void Main_source(string[] args)
+        {
             string path = Environment.GetEnvironmentVariable("RUNPATH");
+            string gdalDataPath ="C:\\Users\\nikos\\.nuget\\packages\\maxrev.gdal.core\\3.10.0.306\\runtimes\\any\\native\\gdal-data";
+            Environment.SetEnvironmentVariable ("GDAL_DATA", gdalDataPath);
+            Gdal.SetConfigOption ("GDAL_DATA", gdalDataPath);
+            string gdalSharePath = "C:/Users/nikos/.nuget/packages/gdal.native/3.10.0/build/gdal/share/";
+            Environment.SetEnvironmentVariable ("PROJ_LIB", gdalSharePath);
+            Gdal.SetConfigOption("PROJ_LIB", gdalSharePath);
 
             if (!string.IsNullOrEmpty(path))
             {
@@ -144,15 +62,17 @@ namespace RoxCaseGen
                 Console.WriteLine("RUNPATH is not set.");
             }
 
-            const int burnDuration = 3;
+            const int burnDuration = 56;
             const int cellsize = 30;
+            const bool ML_train = false;
+            const bool continueFromPrevious = true;
             
             string[] models = { "Farsite",
-                "WISE", 
-                "ELMFIRE", 
-                "EPD", 
-                "LSTM", 
-                "FDS LS1"};
+                //"WISE", 
+                "ELMFIRE", };
+                //"EPD", 
+                //"LSTM", 
+                //"FDS LS1"};
             
             //cd C:\WISE_Builder-1.0.6-beta.5; java -jar WISE_Builder.jar -s -j C:\jobs
             
@@ -160,18 +80,34 @@ namespace RoxCaseGen
             
             //Hoursekeeping
             //Delete Previous Run Leftovers:
-            if (Directory.Exists(path + "/Outputs"))
+
+            int simNo = 0;
+
+            if (continueFromPrevious)
             {
-                Directory.Delete(path+ "/Outputs", true);
+                var tbOutputNames = new List<string> { "ELMFIRE", "EPD", "Farsite", "LSTM", "WISE" };
+                int highestCommonX = ModelSetup.FindHighestCommonX(path + "/Outputs/", tbOutputNames);
+
+                simNo = ML_train ? (int)(Directory.GetFiles($"{path}/ML/").Length/3)+1 : highestCommonX;   
             }
-            Directory.CreateDirectory(path+ "/Outputs");
-            if (Directory.Exists(path + "/Log/"))
+            else
             {
-                Directory.Delete(path+ "/Log/", true);
+                if (Directory.Exists(path + "/Outputs"))
+                {
+                    Directory.Delete(path+ "/Outputs", true);
+                }
+                Directory.CreateDirectory(path+ "/Outputs");
+                if (Directory.Exists(path + "/Log/"))
+                {
+                    Directory.Delete(path+ "/Log/", true);
+                }
+                File.Delete(path + "/log.txt");
+                Directory.CreateDirectory(path+ "/Log/");
+                ModelSetup.cleanupIters(path+"/FDS LS1/");
+                ModelSetup.cleanupIters(path+"/FDS LS4/");
+                simNo = ML_train ? (int)(Directory.GetFiles($"{path}/ML/").Length/3)+1 : 0;
             }
-            Directory.CreateDirectory(path+ "/Log/");
-            ModelSetup.cleanupIters(path+"/FDS LS1/");
-            ModelSetup.cleanupIters(path+"/FDS LS4/");
+
             ModelSetup.prepareNextIteration(path);
             RunModels.checkInputsExist(path);
             PERIL peril = new PERIL();
@@ -179,11 +115,11 @@ namespace RoxCaseGen
             
             float[,] fileInput = please.parseInputFilesToMemory(path + "Input/VARS.txt");
             
-            int[,] WUI_in = new int[(int)fileInput[17, 0], 2];              //pase in the WUI polygon corners
-            for (int i = 0; i < fileInput[17, 0]; i++)
+            int[,] WUI_in = new int[(int)fileInput[15, 0], 2];              //pase in the WUI polygon corners
+            for (int i = 0; i < fileInput[15, 0]; i++)
             {
-                WUI_in[i, 0] = (int)fileInput[18 + 2 * i, 0];
-                WUI_in[i, 1] = (int)fileInput[18 + 2 * i + 1, 0];
+                WUI_in[i, 0] = (int)fileInput[16 + 2 * i, 0];
+                WUI_in[i, 1] = (int)fileInput[16 + 2 * i + 1, 0];
             }
             
             List<PointF> WUI_f = new List<PointF>();
@@ -192,72 +128,128 @@ namespace RoxCaseGen
                 WUI_f.Add(new PointF(WUI_in[i, 0], WUI_in[i, 1]));
             }  
             please.WUI = WUI_f;
-            
+            please.fuelMap = ModelSetup.readASC_int(path + "Input/Farsite/Input/fuel.asc");
+
             int[,] WUI = PERIL.getPolygonEdgeNodes(WUI_in);                 //get all the useful WUI polygon nodes based on the given corners. 
-            string[] header = ModelSetup.getHeader(path + "Input/FUELTEMPLATE.asc");
+            string[] header = ModelSetup.getHeader(path + "Input/Farsite/Input/fuel.asc");
+            ModelSetup.wuiPointsToShapefile(WUI_in, cellsize, header, [please.fuelMap.GetLength(0),please.fuelMap.GetLength(1)],path + "Input/Farsite/Input/fuel.prj",path + "/WUI.shp");
+            
             ModelSetup.Output_ASC_File(header,WUI, path + "/WUIboundary.txt");       //save the used urban nodes in file for debugging/visualisation/further inspection.
+            
             please.setValues(path);
             please.burnDuration = burnDuration;
-            please.fuelMoisture = [6, 7, 8, 60, 90];
-            please.totalRAWSdays = 1 + burnDuration/24;
             please.cellsize = cellsize;
-            please.fuelMap = ModelSetup.readASC_int(path + "Input/FUELTEMPLATE.asc");
+            please.fuelMoisture = [6, 7, 8, 60, 90];
             bool[] modelsDone = new bool[models.Length];
-            int[,,] allSafetyBoundaries = new int[models.GetLength(0),please.fuelMap.GetLength(0), please.fuelMap.GetLength(1)];
-            int simNo = 0;
+            int[,,] allSafetyBoundaries =
+                new int[models.GetLength(0), please.fuelMap.GetLength(0), please.fuelMap.GetLength(1)];
             int[] consecutiveConvergence = new int[models.GetLength(0)];
             float currentError=1;
+
             while (!modelsDone.All(x => x))
             {
-                RunModels.checkInputsExist(path);
-                simNo++;
-                Console.WriteLine($"Sim no: {simNo}, current convergence: ");
-                for (int i = 0; i < models.Length; i++)
+                if (ML_train)
                 {
-                    Console.WriteLine($"{models[i]}: {modelsDone[i]}");
-                }
-                RunModels.setupFarsiteIteration(path + "Farsite/Input/", please);
-                string failFlag = "";
-                for (int i = 0; i < models.GetLength(0); i++)
-                {
-                    RunModels.convertToSpecificModel(models[i], path, please);
-                    try
+                    RunModels.checkInputsExist(path);
+                    Console.WriteLine($"Sim no: {simNo}, current convergence: ");
+                    int[] ignitionCoords = please.InitialiseIterationAndGetIgnition(path);
+                    please.totalRAWSdays = 1 + burnDuration / 24;
+                    RunModels.setupFarsiteIteration(path + "Farsite/Input/", ignitionCoords, please);
+                    RunModels.convertToSpecificModel("Farsite", path, please);
+                    RunModels.RunModel(models[0], path, please, simNo);
+                    Thread.Sleep(500);
+                    if (File.Exists($"{path}/Farsite/Median_Outputs/_ArrivalTime.asc"))
                     {
-                        RunModels.RunModel(models[i], path, please,simNo);
-                        float[,] ros = RunModels.retrieveResult(models[i],path,"ROS", please);
-                        float[,] azimuth = RunModels.retrieveResult(models[i],path,"Azimuth", please);
-                        if (models[i] == "EPD" || models[i] == "LSTM")
-                        {
-                            ModelSetup.Output_ASC_File(header,ros, $"{path}/Input/{models[i]}_ROS_{simNo}.asc");
-                            ModelSetup.Output_ASC_File(header,azimuth, $"{path}/Input/{models[i]}_AZ_{simNo}.asc");
-                        }
-                        int[,] temp = peril.calcSingularBoundary(please.cellsize, (int)please.actualASET, please.windMag, WUI, ros, azimuth);            //Call k-PERIL to find the boundary of this simulation
+                        File.Copy($"{path}/Farsite/Median_Outputs/_ArrivalTime.asc",
+                            $"{path}/ML/Farsite_AT_{simNo}.asc");
+                        File.Copy($"{path}/Farsite/Median_Outputs/_SpreadDirection.asc",
+                            $"{path}/ML/Farsite_RAZ_{simNo}.asc");
+                        File.Copy($"{path}/Farsite/Median_Outputs/_SpreadRate.asc",
+                            $"{path}/ML/Farsite_ROS_{simNo}.asc");
+                    }
+                    Thread.Sleep(1000);
+                    simNo++;
+                }
+                else
+                {
+                    RunModels.checkInputsExist(path);
+                    simNo++;
+                    Console.WriteLine($"Sim no: {simNo}, current convergence: ");
+                    for (int i = 0; i < models.Length; i++)
+                    {
+                        Console.WriteLine($"{models[i]}: {modelsDone[i]}");
+                    }
 
-                        for (int j = 0; j < temp.GetLength(0); j++)
+                    int[] ignitionCoords = please.InitialiseIterationAndGetIgnition(path);
+                    please.totalRAWSdays = 30;
+                    please.GetFMC(path);
+                    please.totalRAWSdays = 1 + burnDuration / 24;
+                    RunModels.setupFarsiteIteration(path + "Farsite/Input/", ignitionCoords, please);
+
+                    string failFlag = "";
+                    for (int i = 1; i < models.GetLength(0); i++)
+                    {
+                        RunModels.convertToSpecificModel(models[i], path, please);
+                        try
                         {
-                            for (int k = 0; k < temp.GetLength(1); k++)
+                            RunModels.RunModel(models[i], path, please, simNo);
+                            float[,] ros = RunModels.retrieveResult(models[i], path, "ROS", please);
+                            float[,] azimuth = RunModels.retrieveResult(models[i], path, "Azimuth", please);
+                            //ros = ModelSetup.TransposeMatrix(ros);
+                            //azimuth = ModelSetup.TransposeMatrix(azimuth);
+                            ModelSetup.Output_ASC_File(header, ros, $"{path}/Log/{models[i]}_ROS_{simNo}.asc");
+                            ModelSetup.Output_ASC_File(header, azimuth, $"{path}/Log/{models[i]}_AZ_{simNo}.asc");
+
+                            int[,] temp = peril.calcSingularBoundary(please.cellsize, (int)please.actualASET,
+                                please.windMag, WUI, ros,
+                                azimuth); //Call k-PERIL to find the boundary of this simulation
+                            temp = ModelSetup.TransposeMatrix(temp);
+                            for (int j = 0; j < temp.GetLength(0); j++)
                             {
-                                allSafetyBoundaries[i,j,k] += temp[j, k];
+                                for (int k = 0; k < temp.GetLength(1); k++)
+                                {
+                                    allSafetyBoundaries[i, j, k] += temp[j, k];
+                                }
+                            }
+
+                            ModelSetup.Output_ASC_File(header, temp,
+                                path + $"Outputs/SafetyMatrix_{models[i]}_" + simNo + ".txt");
+                            if (simNo > 20)
+                            {
+                                currentError = please.CalcConvergence(simNo, path, models[i]);
                             }
                         }
-                        ModelSetup.Output_ASC_File(header, temp, path + $"Outputs/SafetyMatrix_{models[i]}_" + simNo + ".txt");
-                        if (simNo > 20) { currentError = please.CalcConvergence(simNo, path, models[i]); }
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine($"==========Model {models[i]} failed, skipping.==============");
-                        failFlag = "_failed";
-                    }
-                    ModelSetup.Output_ASC_File(header, ModelSetup.GetSlice(allSafetyBoundaries,i), path + $"Outputs/SafetyMatrix_{models[i]}{failFlag}.txt");
-                    if (currentError < 0.003) { consecutiveConvergence[i]++; }
-                    else { consecutiveConvergence[i]=0; }
-                    if (consecutiveConvergence[i] >= 20) { modelsDone[i] = true; }
-                    modelsDone[modelsDone.Length-1] = true;
-                    modelsDone[modelsDone.Length-2] = true;
-                }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine($"==========Model {models[i]} failed, skipping.==============");
+                            failFlag = "_failed";
+                        }
 
-                RunModels.logArrivalTimes(path, simNo);
-                ModelSetup.prepareNextIteration(path);
+                        ModelSetup.Output_ASC_File(header, ModelSetup.GetSlice(allSafetyBoundaries, i),
+                            path + $"Outputs/SafetyMatrix_{models[i]}{failFlag}.txt");
+                        if (currentError < 0.003)
+                        {
+                            consecutiveConvergence[i]++;
+                        }
+                        else
+                        {
+                            consecutiveConvergence[i] = 0;
+                        }
+
+                        if (consecutiveConvergence[i] >= 20)
+                        {
+                            modelsDone[i] = true;
+                        }
+
+                        failFlag = "";
+                        //modelsDone[modelsDone.Length-1] = true;
+                        //modelsDone[modelsDone.Length-2] = true;
+                    }
+                    RunModels.logArrivalTimes(path, simNo);
+                    Console.WriteLine($"Iteration finished: {simNo}");
+                    //Console.ReadLine();
+                    ModelSetup.prepareNextIteration(path);
+                }
             }
 
             for (int i = 0; i < models.GetLength(0); i++)
@@ -272,6 +264,83 @@ namespace RoxCaseGen
                 }
                 ModelSetup.Output_ASC_File(header, output, path + $"Outputs/SafetyMatrix_{models[i]}.txt");
             }
+        }
+
+        static void Main_demo()
+        {
+            string strWorkPath =
+                Path.GetDirectoryName(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName);
+            ModelSetup please = new ModelSetup();
+            
+            if (Directory.Exists(strWorkPath + "/Output") && Directory.EnumerateFiles(strWorkPath + "/Output").Any())
+            {
+                Directory.Delete(strWorkPath+ "/Output", true);
+            }
+            Directory.CreateDirectory(strWorkPath+ "/Output");
+            
+            float[,] fileInput = please.parseInputFilesToMemory(strWorkPath + "/Input/variables.txt");
+            string[] header = ModelSetup.getHeader(strWorkPath + "/Input/fuel.asc");
+            please.fuelMap = ModelSetup.readASC_int(strWorkPath + "/Input/fuel.asc");
+
+            int[,] WUI_in = new int[(int)fileInput[15, 0], 2];              //pase in the WUI polygon corners
+            for (int i = 0; i < fileInput[15, 0]; i++)
+            {
+                WUI_in[i, 0] = (int)fileInput[16 + 2 * i, 0];
+                WUI_in[i, 1] = (int)fileInput[16 + 2 * i + 1, 0];
+            }
+            ModelSetup.wuiPointsToShapefile(WUI_in, 30, header, [please.fuelMap.GetLength(0),please.fuelMap.GetLength(1)],strWorkPath + "/Input/fuel.prj",strWorkPath + "/Output/WUI.shp");
+            int[,] WUI = PERIL.getPolygonEdgeNodes(WUI_in);
+            
+            PERIL peril = new PERIL();
+            
+            var fileCount = (from file in Directory.EnumerateFiles(strWorkPath + "/SimResults/", "*.asc", SearchOption.AllDirectories)
+                select file).Count();
+            int[,] probTB =
+                new int[please.fuelMap.GetLength(0), please.fuelMap.GetLength(1)];
+            int consecutiveConvergence = 0;
+            for (int i = 0; i < fileCount/2; i++)
+            {
+                var ros = ModelSetup.readASC_float(strWorkPath + "/SimResults/ELMFIRE_ROS_" + i + ".asc");
+                var az = ModelSetup.readASC_float(strWorkPath + "/SimResults/ELMFIRE_AZ_" + i + ".asc");
+                int[,] temp = peril.calcSingularBoundary(30, (int)80,
+                    15, WUI, ros,az); 
+                temp = ModelSetup.TransposeMatrix(temp);
+                ModelSetup.Output_ASC_File(header, temp,
+                    strWorkPath + $"/Output/TriggerBoundary_{i+1}.asc");
+
+                float currentError = 1;
+                if (i >= 2)
+                {
+                    currentError = please.demo_CalcConvergence(i+1, strWorkPath);
+                }
+                consecutiveConvergence = (currentError<0.01) ? consecutiveConvergence + 1 : 0;
+
+                for (int j = 0; j < temp.GetLength(0); j++)
+                {
+                    for (int k = 0; k < temp.GetLength(1); k++)
+                    {
+                        probTB[j, k] += temp[j, k];
+                    }
+                }
+                ModelSetup.Output_ASC_File(header, probTB,
+                    strWorkPath + $"/Output/ProbabilisticTriggerBoundary.asc");
+
+                Console.WriteLine($"===========================================");
+                Console.WriteLine($"Trigger Boundary {i+1} finished.");
+                Console.WriteLine($"===========================================");
+                Console.WriteLine($"Current convergence number: {currentError}, goal is 0.01 and below for 20 consecutive iterations");
+                Console.WriteLine($"Convergence number under 0.01 for the last {consecutiveConvergence} consecutive iterations.");
+                Console.WriteLine($"===========================================");
+                if (consecutiveConvergence >= 20)
+                {
+                    break;
+                }
+            }
+            Console.WriteLine($"===========================================");
+            Console.WriteLine($"Probabilistic Trigger Boundary Calculation Finished");
+            Console.WriteLine($"Press any key to continue...");
+            Console.WriteLine($"===========================================");
+            Console.ReadKey();
         }
     }
 }
