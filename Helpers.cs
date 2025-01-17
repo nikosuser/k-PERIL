@@ -82,8 +82,6 @@ namespace RoxCaseGen
         int avgWindMag;
         int varAvgWindMag;
 
-        public int totalRAWSdays;
-
         float actualMaxTemp;
         float actualMinTemp;
         float actualMaxTime;
@@ -99,8 +97,7 @@ namespace RoxCaseGen
         public float[] humidProfile;
         public float[] tempProfile;
 
-        public string year;
-        public string month;
+        public DateTime rawStartTime;
 
         public int xIgnition_raster;
         public int yIgnition_raster;
@@ -114,7 +111,8 @@ namespace RoxCaseGen
 
         public int[,] fuelMap;
 
-        public int burnDuration;
+        public int burnHours;
+        public int conditioningDays;
         
         public int[] fuelMoisture;
 
@@ -146,8 +144,6 @@ namespace RoxCaseGen
 
             this.avgWindMag = (int)fileInput[12, 0];
             this.varAvgWindMag = (int)fileInput[13, 0];
-
-            this.totalRAWSdays = (int)fileInput[14, 0];
             this.ASET = (int)fileInput[fileInput.GetLength(0) - 2, 0];
             this.varASET = (int)fileInput[fileInput.GetLength(0) - 1, 0];
             //Console.WriteLine("Values Parsed!");
@@ -157,12 +153,26 @@ namespace RoxCaseGen
         {
             this.actualMaxTemp = getRandNormal(maxTemp, varMaxTemp);
             this.actualMinTemp = getRandNormal(minTemp, varMinTemp);
-            this.actualMaxTime = (int)getRandNormal(maxTime, varMaxTime);
-            this.actualMinTime = (int)getRandNormal(minTime, varMinTime);
-            if (this.actualMinTime > 23) this.actualMinTime = 0;                    //Minimum time values default to zero if the random generator returned values of more than 24 or less than 0
+            this.actualMaxTime = (int)getRandNormal(maxTime, varMaxTime) % 24;
+            this.actualMinTime = (int)getRandNormal(minTime, varMinTime) % 24;
             this.actualMaxHumid = getRandNormal(maxHumid, varMaxHumid);
+            if (this.actualMaxHumid < 0)
+            {
+                this.actualMaxHumid = 0;
+            }
+            if (this.actualMaxHumid > 100)
+            {
+                this.actualMaxHumid = 100;
+            }
             this.actualMinHumid = getRandNormal(minHumid, varMinHumid);
-
+            if (this.actualMinHumid < 0)
+            {
+                this.actualMinHumid = 0;
+            }
+            if (this.actualMinHumid > 100)
+            {
+                this.actualMinHumid = 100;
+            }
             while (this.actualMaxTemp < this.actualMinTemp)                         //make sure the Maximum temperature is larger than the minimum.
             {
                 this.actualMaxTemp = getRandNormal(maxTemp, varMaxTemp);
@@ -268,9 +278,10 @@ namespace RoxCaseGen
         public void createAndWriteFileFARSITE(string Path)                     //create the input file required by the FARSITE console application.
         {
             List<string> outputFile = new List<string>(); //[15 + 256 + this.totalRAWSdays * 24 + 20];           //instantiate the output array
-            this.year = "2022";                                                                     //date of starting data, doesnt really matter.
-            this.month = "9";
-            outputFile.Add($"CONDITIONING_PERIOD_END: {this.month} {this.totalRAWSdays} 2300");
+            
+            DateTime currTime = this.rawStartTime;
+            
+            outputFile.Add($"CONDITIONING_PERIOD_END: {(this.rawStartTime.AddHours(this.burnHours)).Month.ToString("D")} {(this.rawStartTime.AddHours(this.burnHours)).Day.ToString("D")} 2300");
             outputFile.Add($"FUEL_MOISTURES_DATA: {this.fmc.GetLength(0)+1}");                                             //all the fuel moistures are the same and hardcoded below for now.
             outputFile.Add("0 6 7 8 60 90");
             for (int i = 0; i < this.fmc.GetLength(0); i++)
@@ -279,13 +290,11 @@ namespace RoxCaseGen
             }
             outputFile.Add("RAWS_ELEVATION: 10");                                               //random value added for now. Maybe it is too high?
             outputFile.Add("RAWS_UNITS: Metric");                                                 //All values declared metric
-            outputFile.Add($"RAWS: {(this.totalRAWSdays * 24).ToString()}");                   //Calculate and declare how many weather points will follow
-            for (int i = 0; i < this.totalRAWSdays; i++)                                          //Output all the weather data in FARSITE flavor. Precipitation is defaulted to 20%
+            outputFile.Add($"RAWS: {(this.burnHours+23).ToString()}");                   //Calculate and declare how many weather points will follow
+            for (int i = 0; i < this.burnHours+23; i++)                                          //Output all the weather data in FARSITE flavor. Precipitation is defaulted to 20%
             {
-                for (int j = 0; j < 24; j++)
-                {
-                    outputFile.Add($"{year} {month} {i + 1} {j * 100} {(int)this.tempProfile[j]} {(int)this.humidProfile[j]} 0.00 {(int)this.windMag} {this.windDir} 0");
-                }
+                outputFile.Add($"{currTime.Year.ToString("D")} {currTime.Month.ToString("D")} {currTime.Day.ToString("D")} {(currTime.Hour*100).ToString("D")} {(int)this.tempProfile[currTime.Hour]} {(int)this.humidProfile[currTime.Hour]} 0.00 {(int)this.windMag} {this.windDir} 0");
+                currTime = currTime.AddHours(1);
             }
             //THe FARSITE simulations will happen with the below parameters. They are currently hardcoded. Notice how GRIDDED WIND is being used here.
             outputFile.Add("FOLIAR_MOISTURE_CONTENT: 60");
@@ -293,8 +302,8 @@ namespace RoxCaseGen
             outputFile.Add("NUMBER_PROCESSORS: 32");
             outputFile.Add("GRIDDED_WINDS_GENERATE: Yes");
             outputFile.Add("GRIDDED_WINDS_RESOLUTION: 10.0");
-            outputFile.Add($"FARSITE_START_TIME: {this.month} {this.totalRAWSdays-this.burnDuration/24} {23-this.burnDuration%24}00"); 
-            outputFile.Add($"FARSITE_END_TIME: {this.month} {this.totalRAWSdays} 2300");
+            outputFile.Add($"FARSITE_START_TIME: {this.rawStartTime.Month.ToString("D")} {this.rawStartTime.Day.ToString("D")} {this.rawStartTime.Hour.ToString("D")}00"); 
+            outputFile.Add($"FARSITE_END_TIME: {(this.rawStartTime.AddHours(this.burnHours)).Month.ToString("D")} {(this.rawStartTime.AddHours(this.burnHours)).Day.ToString("D")} {(this.rawStartTime.AddHours(this.burnHours)).Hour.ToString("D")}00");
             outputFile.Add("FARSITE_TIMESTEP: 60");
             outputFile.Add("FARSITE_DISTANCE_RES: 60.0");
             outputFile.Add("FARSITE_PERIMETER_RES: 60.0");
@@ -313,10 +322,9 @@ namespace RoxCaseGen
         public void createAndWriteFileFLAMMAP(string Path)                     //create the input file required by the FARSITE console application.
         {
             List<string> outputFile = new List<string>(); //[15 + 256 + this.totalRAWSdays * 24 + 20];           //instantiate the output array
-            this.year = "2022";                                                                     //date of starting data, doesnt really matter.
-            this.month = "6";
+            DateTime currTime = this.rawStartTime;
 
-            outputFile.Add($"CONDITIONING_PERIOD_END: {this.month} {this.totalRAWSdays} 1600");
+            outputFile.Add($"CONDITIONING_PERIOD_END: {(this.rawStartTime.AddDays(this.conditioningDays)).Month.ToString("D")} {(this.rawStartTime.AddDays(this.conditioningDays)).Day.ToString("D")} {(this.rawStartTime.AddDays(this.conditioningDays)).Hour.ToString("D")}00");
 
             outputFile.Add("FUEL_MOISTURES_DATA: 255");                                             //all the fuel moistures are the same and hardcoded below for now.
             for (int i = 1; i < 256; i++)
@@ -326,13 +334,11 @@ namespace RoxCaseGen
             outputFile.Add("RAWS_ELEVATION: 10");                                               
             outputFile.Add("RAWS_UNITS: Metric"); 
             outputFile.Add("WIND_SPEED_UNITS: 1"); //All values declared metric
-            outputFile.Add($"RAWS: {(this.totalRAWSdays * 24).ToString()}");                   //Calculate and declare how many weather points will follow
-            for (int i = 0; i < this.totalRAWSdays; i++)                                          //Output all the weather data in FARSITE flavor. Precipitation is defaulted to 20%
+            outputFile.Add($"RAWS: {((this.conditioningDays + 1) * 24).ToString()}");                   //Calculate and declare how many weather points will follow
+            for (int i = 0; i < (this.conditioningDays + 1) * 24; i++)                                          //Output all the weather data in FARSITE flavor. Precipitation is defaulted to 20%
             {
-                for (int j = 0; j < 24; j++)
-                {
-                    outputFile.Add($"{year} {month} {i + 1} {j * 100} {(int)this.tempProfile[j]} {(int)this.humidProfile[j]} 0.00 {(int)this.windMag} {this.windDir} 0");
-                }
+                outputFile.Add($"{currTime.Year.ToString("D")} {currTime.Month.ToString("D")} {currTime.Day.ToString("D")} {(currTime.Hour*100).ToString("D")} {(int)this.tempProfile[currTime.Hour]} {(int)this.humidProfile[currTime.Hour]} 0.00 {(int)this.windMag} {this.windDir} 0");
+                currTime = currTime.AddHours(1);
             }
             //THe FARSITE simulations will happen with the below parameters. They are currently hardcoded. Notice how GRIDDED WIND is being used here.
             outputFile.Add("FOLIAR_MOISTURE_CONTENT: 80");
@@ -346,7 +352,6 @@ namespace RoxCaseGen
 
             outputFile.Add("SPREADRATE:");
             outputFile.Add("MAXSPREADDIR:");
-            outputFile.Add("SOLARRADIATION:");
             outputFile.Add("FUELMOISTURE1:");
             outputFile.Add("FUELMOISTURE10:");
             outputFile.Add("FUELMOISTURE100:");
@@ -771,7 +776,9 @@ namespace RoxCaseGen
             {
                 for (int j = 0; j<currentSF.GetLength(1); j++)
                 {
-                    currentOutput[i, j] = previousOutput[i, j] + currentSF[i, j];
+                    if (previousOutput[i, j] < 0){previousOutput[i, j] = 0;}
+                    if (currentSF[i, j] < 0){currentSF[i, j] = 0;}
+                    currentOutput[i, j] = previousOutput[i, j] - currentSF[i, j];
                 }
             }
 
@@ -1041,7 +1048,7 @@ namespace RoxCaseGen
             {
                 for (int j = 0; j < this.fuelMap.GetLength(1); j++)
                 {
-                    if (hour1fmc[i, j] > 0 && hour10fmc[i, j] > 0 && hour100fmc[i, j] > 0 && fuelmap13[i,j] > 0)
+                    if (hour1fmc[i, j] > 0 && hour10fmc[i, j] > 0 && hour100fmc[i, j] > 0 && fuelmap13[i,j] > 0 )
                     {
                         int loc = Array.IndexOf(fuelsPresent,this.fuelMap[i, j]);
                         fuelMoistures[loc,0] ++;
@@ -1054,6 +1061,7 @@ namespace RoxCaseGen
                         fuelMoistures13[loc2,1] += hour1fmc[i,j];
                         fuelMoistures13[loc2,2] += hour10fmc[i,j];
                         fuelMoistures13[loc2,3] += hour100fmc[i,j];
+                        
                     } 
                 }
             }
@@ -1067,13 +1075,18 @@ namespace RoxCaseGen
                 fmcOut[i, 3] = (int)(100 * fuelMoistures[i, 3] / fuelMoistures[i, 0]);
                 fmcOut[i, 4] = 60;
                 fmcOut[i, 5] = 90;
+                for (int j = 0; j < 4; j++)
+                {
+                    if (fmcOut[i,j] <= 0){fmcOut[i,j] = 4;}
+                }
+                
             }
             //remmeber to alter the FMC creation function
             
             this.fmc = fmcOut;
             
-            int[,] fmcOut13 = new int [fuelsPresent.Length,6];
-            for (int i = 0; i < fmcOut.GetLength(0); i++)
+            int[,] fmcOut13 = new int [fuelsPresent13.Length,6];
+            for (int i = 0; i < fmcOut13.GetLength(0); i++)
             {
                 fmcOut13[i, 0] = fuelsPresent13[i];
                 fmcOut13[i, 1] = (int)(100 * fuelMoistures13[i, 1] / fuelMoistures13[i, 0]);
@@ -1090,6 +1103,7 @@ namespace RoxCaseGen
         public static void CreateMultiBandGeoTiff(
         float[,] rasterData2D,    // or short[,] if using Int16
         int numberOfBands,
+        int multiplier,
         string outputFilename,
         string sampleGeoTiff,
         DataType gdalDataType)
@@ -1171,7 +1185,10 @@ namespace RoxCaseGen
                 {
                     for (int col = 0; col < width; col++)
                     {
-                        flatArray[index] = rasterData2D[row, col];
+                        // MULTIPLY EACH VALUE BY 100 HERE
+                        if (rasterData2D[row, col]>0){
+                            flatArray[index] = rasterData2D[row, col] * multiplier;
+                        }
                         index++;
                     }
                 }

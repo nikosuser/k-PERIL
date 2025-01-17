@@ -40,10 +40,10 @@ namespace RoxCaseGen
     {
         static void Main(string[] args)
         {
-            //Main_source([]);
-            Main_demo();
+            Main_source();
+            //Main_demo();
         }
-        static void Main_source(string[] args)
+        static void Main_source()
         {
             string path = Environment.GetEnvironmentVariable("RUNPATH");
             string gdalDataPath ="C:\\Users\\nikos\\.nuget\\packages\\maxrev.gdal.core\\3.10.0.306\\runtimes\\any\\native\\gdal-data";
@@ -62,17 +62,18 @@ namespace RoxCaseGen
                 Console.WriteLine("RUNPATH is not set.");
             }
 
-            const int burnDuration = 56;
+            const int conditioningDays = 30;
+            const int burnHours = 500;
             const int cellsize = 30;
             const bool ML_train = false;
-            const bool continueFromPrevious = true;
+            const bool continueFromPrevious = false;
             
             string[] models = { "Farsite",
-                //"WISE", 
-                "ELMFIRE", };
-                //"EPD", 
-                //"LSTM", 
-                //"FDS LS1"};
+                "WISE", 
+                "ELMFIRE",
+                "EPD", 
+                "LSTM", 
+                "FDS LS1"};
             
             //cd C:\WISE_Builder-1.0.6-beta.5; java -jar WISE_Builder.jar -s -j C:\jobs
             
@@ -88,7 +89,9 @@ namespace RoxCaseGen
                 var tbOutputNames = new List<string> { "ELMFIRE", "EPD", "Farsite", "LSTM", "WISE" };
                 int highestCommonX = ModelSetup.FindHighestCommonX(path + "/Outputs/", tbOutputNames);
 
-                simNo = ML_train ? (int)(Directory.GetFiles($"{path}/ML/").Length/3)+1 : highestCommonX;   
+                simNo = ML_train ? (int)(Directory.GetFiles($"{path}/ML/").Length/3)+1 : highestCommonX; 
+                
+                //reset convergence stuff
             }
             else
             {
@@ -115,11 +118,11 @@ namespace RoxCaseGen
             
             float[,] fileInput = please.parseInputFilesToMemory(path + "Input/VARS.txt");
             
-            int[,] WUI_in = new int[(int)fileInput[15, 0], 2];              //pase in the WUI polygon corners
-            for (int i = 0; i < fileInput[15, 0]; i++)
+            int[,] WUI_in = new int[(int)fileInput[14, 0], 2];              //pase in the WUI polygon corners
+            for (int i = 0; i < fileInput[14, 0]; i++)
             {
-                WUI_in[i, 0] = (int)fileInput[16 + 2 * i, 0];
-                WUI_in[i, 1] = (int)fileInput[16 + 2 * i + 1, 0];
+                WUI_in[i, 0] = (int)fileInput[15 + 2 * i, 0];
+                WUI_in[i, 1] = (int)fileInput[15 + 2 * i + 1, 0];
             }
             
             List<PointF> WUI_f = new List<PointF>();
@@ -129,7 +132,6 @@ namespace RoxCaseGen
             }  
             please.WUI = WUI_f;
             please.fuelMap = ModelSetup.readASC_int(path + "Input/Farsite/Input/fuel.asc");
-
             int[,] WUI = PERIL.getPolygonEdgeNodes(WUI_in);                 //get all the useful WUI polygon nodes based on the given corners. 
             string[] header = ModelSetup.getHeader(path + "Input/Farsite/Input/fuel.asc");
             ModelSetup.wuiPointsToShapefile(WUI_in, cellsize, header, [please.fuelMap.GetLength(0),please.fuelMap.GetLength(1)],path + "Input/Farsite/Input/fuel.prj",path + "/WUI.shp");
@@ -137,9 +139,11 @@ namespace RoxCaseGen
             ModelSetup.Output_ASC_File(header,WUI, path + "/WUIboundary.txt");       //save the used urban nodes in file for debugging/visualisation/further inspection.
             
             please.setValues(path);
-            please.burnDuration = burnDuration;
+            please.burnHours = burnHours;
+            please.conditioningDays = conditioningDays;
             please.cellsize = cellsize;
             please.fuelMoisture = [6, 7, 8, 60, 90];
+            please.rawStartTime = new DateTime(2025, 1, 1, 0, 0, 0);
             bool[] modelsDone = new bool[models.Length];
             int[,,] allSafetyBoundaries =
                 new int[models.GetLength(0), please.fuelMap.GetLength(0), please.fuelMap.GetLength(1)];
@@ -153,7 +157,7 @@ namespace RoxCaseGen
                     RunModels.checkInputsExist(path);
                     Console.WriteLine($"Sim no: {simNo}, current convergence: ");
                     int[] ignitionCoords = please.InitialiseIterationAndGetIgnition(path);
-                    please.totalRAWSdays = 1 + burnDuration / 24;
+                    please.conditioningDays = 1 + burnHours / 24;
                     RunModels.setupFarsiteIteration(path + "Farsite/Input/", ignitionCoords, please);
                     RunModels.convertToSpecificModel("Farsite", path, please);
                     RunModels.RunModel(models[0], path, please, simNo);
@@ -181,9 +185,7 @@ namespace RoxCaseGen
                     }
 
                     int[] ignitionCoords = please.InitialiseIterationAndGetIgnition(path);
-                    please.totalRAWSdays = 30;
                     please.GetFMC(path);
-                    please.totalRAWSdays = 1 + burnDuration / 24;
                     RunModels.setupFarsiteIteration(path + "Farsite/Input/", ignitionCoords, please);
 
                     string failFlag = "";

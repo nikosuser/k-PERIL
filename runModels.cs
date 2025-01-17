@@ -203,7 +203,8 @@ namespace RoxCaseGen
                 case "Farsite":
                     break;
                 case "WISE":
-                    string[,] wise_weather = new string[please.totalRAWSdays * 24 + 1, 7];
+                    DateTime currTime = please.rawStartTime;
+                    string[,] wise_weather = new string[please.burnHours+2, 7];
                     wise_weather[0, 0] = "HOURLY";
                     wise_weather[0, 1] = "HOUR";
                     wise_weather[0, 2] = "TEMP";
@@ -211,21 +212,16 @@ namespace RoxCaseGen
                     wise_weather[0, 4] = "WD";
                     wise_weather[0, 5] = "WS";
                     wise_weather[0, 6] = "PRECIP";
-                    for (int i = 0;
-                         i < please.totalRAWSdays;
-                         i++) //Output all the weather data in FARSITE flavor. Precipitation is defaulted to 20%
-                    {
-                        for (int j = 0; j < 24; j++)
-                        {
-                            wise_weather[i * 24 + j + 1, 0] =
-                                $"{(i + 1).ToString("D" + 2)}/{Int16.Parse(please.month).ToString("D" + 2)}/{please.year}";
-                            wise_weather[i * 24 + j + 1, 1] = j.ToString("D" + 2);
-                            wise_weather[i * 24 + j + 1, 2] = please.tempProfile[j].ToString();
-                            wise_weather[i * 24 + j + 1, 3] = please.humidProfile[j].ToString();
-                            wise_weather[i * 24 + j + 1, 4] = please.windDir.ToString();
-                            wise_weather[i * 24 + j + 1, 5] = please.windMag.ToString();
-                            wise_weather[i * 24 + j + 1, 6] = 0.ToString();
-                        }
+                    for (int i = 1; i < please.burnHours+2; i++) {
+                        wise_weather[i, 0] =
+                            $"{currTime.Day.ToString("D" + 2)}/{currTime.Month.ToString("D" + 2)}/{currTime.Year}";
+                        wise_weather[i, 1] = currTime.Hour.ToString("D" + 2);
+                        wise_weather[i, 2] = please.tempProfile[currTime.Hour].ToString();
+                        wise_weather[i, 3] = please.humidProfile[currTime.Hour].ToString();
+                        wise_weather[i, 4] = please.windDir.ToString();
+                        wise_weather[i, 5] = please.windMag.ToString();
+                        wise_weather[i, 6] = 0.ToString();
+                        currTime = currTime.AddHours(1);
                     }
 
                     // Get the number of rows and columns
@@ -245,7 +241,7 @@ namespace RoxCaseGen
 
                     //how get elevation of weather station?
                     double[] ignitionCoords = ModelSetup.convertCoords((double)please.xIgnition_prj,
-                        (double)please.yIgnition_prj, 35, true);
+                        (double)please.yIgnition_prj, 12, true);
                     Console.WriteLine($"{ignitionCoords[0]},{ignitionCoords[1]}");
                     Dictionary<string, string> simulationSetup = new Dictionary<string, string>();
 
@@ -256,18 +252,18 @@ namespace RoxCaseGen
                     simulationSetup.Add("Elevation Projection File Name", "elevation.prj");
                     simulationSetup.Add("Weather File Name", "weather.txt");
                     simulationSetup.Add($"Ignition Time",
-                        $"{please.year}-{Int16.Parse(please.month).ToString("D" + 2)}-{(please.totalRAWSdays - please.burnDuration / 24).ToString("D" + 2)}T{(23 - please.burnDuration % 24).ToString("D" + 2)}:00:00-00:00");
+                        $"{please.rawStartTime.ToString("s")}");
                     simulationSetup.Add("Ignition Coords", $"{ignitionCoords[1]} ,{ignitionCoords[0]}");
                     simulationSetup.Add("Simulation End Time",
-                        $"{please.year}-{Int16.Parse(please.month).ToString("D" + 2)}-{please.totalRAWSdays.ToString("D" + 2)}T23:00:00-00:00");
+                        $"{please.rawStartTime.AddHours(please.burnHours).ToString("s")}");
                     simulationSetup.Add("Weather Station Height",
                         $"{ModelSetup.getElevation((int)please.xIgnition_raster, (int)please.yIgnition_raster, path + "WISE/Input/elevation.asc")}"); //<------------
                     simulationSetup.Add("Weather Station Coords",
                         $"{ignitionCoords[1]} ,{ignitionCoords[0]}"); //<------------
                     simulationSetup.Add("Weather Station Start Date",
-                        $"{please.year}-{Int16.Parse(please.month).ToString("D" + 2)}-01");
+                        $"{please.rawStartTime.Year}-{please.rawStartTime.Month.ToString("D" + 2)}-{please.rawStartTime.Day.ToString("D" + 2)}");
                     simulationSetup.Add("Weather Station End Date",
-                        $"{please.year}-{Int16.Parse(please.month).ToString("D" + 2)}-{please.totalRAWSdays.ToString("D" + 2)}");
+                        $"{please.rawStartTime.AddHours(please.burnHours+1).Year}-{please.rawStartTime.AddHours(please.burnHours+1).Month.ToString("D" + 2)}-{please.rawStartTime.AddHours(please.burnHours+1).Day.ToString("D" + 2)}");
 
                     using (StreamWriter file = new StreamWriter(path + @"WISE/wise_in.txt"))
                     {
@@ -279,43 +275,6 @@ namespace RoxCaseGen
 
                     break;
                 case "ELMFIRE":
-                    /*
-                    string[,] output = new string[please.burnDuration + 1, 7];
-                    output[0, 0] = "ws";
-                    output[0, 1] = "wd";
-                    output[0, 2] = "m1";
-                    output[0, 3] = "m10";
-                    output[0, 4] = "m100";
-                    output[0, 5] = "lh";
-                    output[0, 6] = "lw";
-                    for (int i = 1; i < please.burnDuration; i++)
-                    {
-                        output[i, 0] = please.windMag.ToString();
-                        output[i, 1] = please.windDir.ToString();
-                        output[i, 2] = please.fuelMoisture[0].ToString();
-                        output[i, 3] = please.fuelMoisture[1].ToString();
-                        output[i, 4] = please.fuelMoisture[2].ToString();
-                        output[i, 5] = please.fuelMoisture[3].ToString();
-                        output[i, 6] = please.fuelMoisture[4].ToString();
-                    }
-
-                    // Get the number of rows and columns
-                    int rows = output.GetLength(0);
-                    int columns = output.GetLength(1);
-                    using (StreamWriter writer = new StreamWriter(path + "ELMFIRE/weather.csv"))
-                    {
-                        for (int i = 0; i < rows; i++)
-                        {
-                            string[] row = new string[columns];
-                            for (int j = 0; j < columns; j++)
-                            {
-                                row[j] = output[i, j];
-                            }
-
-                            writer.Write(string.Join(",", row) + "\n");
-                        }
-                    }
-                    */
                     string gdalDataPath ="C:\\Users\\nikos\\.nuget\\packages\\maxrev.gdal.core\\3.10.0.306\\runtimes\\any\\native\\gdal-data";
                     Environment.SetEnvironmentVariable ("GDAL_DATA", gdalDataPath);
                     Gdal.SetConfigOption ("GDAL_DATA", gdalDataPath);
@@ -323,9 +282,9 @@ namespace RoxCaseGen
                     Environment.SetEnvironmentVariable ("PROJ_LIB", gdalSharePath);
                     Gdal.SetConfigOption("PROJ_LIB", gdalSharePath);
                     Gdal.AllRegister();
-                    ModelSetup.CreateMultiBandGeoTiff(ModelSetup.readASC_float($"{path}/Farsite/Median_Outputs/FLAMMAP_FUELMOISTURE1.asc"),please.burnDuration,$"{path}/ELMFIRE/input/m1.tif",$"{path}/ELMFIRE/input/dem.tif",DataType.GDT_Float32);
-                    ModelSetup.CreateMultiBandGeoTiff(ModelSetup.readASC_float($"{path}/Farsite/Median_Outputs/FLAMMAP_FUELMOISTURE10.asc"),please.burnDuration,$"{path}/ELMFIRE/input/m10.tif",$"{path}/ELMFIRE/input/dem.tif",DataType.GDT_Float32);
-                    ModelSetup.CreateMultiBandGeoTiff(ModelSetup.readASC_float($"{path}/Farsite/Median_Outputs/FLAMMAP_FUELMOISTURE100.asc"),please.burnDuration,$"{path}/ELMFIRE/input/m100.tif",$"{path}/ELMFIRE/input/dem.tif",DataType.GDT_Float32);
+                    ModelSetup.CreateMultiBandGeoTiff(ModelSetup.readASC_float($"{path}/Farsite/Median_Outputs/FLAMMAP_FUELMOISTURE1.asc"),1,100,$"{path}/ELMFIRE/input/m1.tif",$"{path}/ELMFIRE/input/dem.tif",DataType.GDT_Float32);
+                    ModelSetup.CreateMultiBandGeoTiff(ModelSetup.readASC_float($"{path}/Farsite/Median_Outputs/FLAMMAP_FUELMOISTURE10.asc"),1,100,$"{path}/ELMFIRE/input/m10.tif",$"{path}/ELMFIRE/input/dem.tif",DataType.GDT_Float32);
+                    ModelSetup.CreateMultiBandGeoTiff(ModelSetup.readASC_float($"{path}/Farsite/Median_Outputs/FLAMMAP_FUELMOISTURE100.asc"),1,100,$"{path}/ELMFIRE/input/m100.tif",$"{path}/ELMFIRE/input/dem.tif",DataType.GDT_Float32);
                     float[,] matrix = new float[please.fuelMap.GetLength(0), please.fuelMap.GetLength(1)];
                     float[] outputValues = [please.fuelMoisture[3],please.fuelMoisture[4],please.windMag,please.windDir];
                     string[] outputNames = ["lh", "lw", "ws", "wd"];
@@ -338,12 +297,11 @@ namespace RoxCaseGen
                                 matrix[r, c] = outputValues[i];
                             }
                         }
-                        ModelSetup.CreateMultiBandGeoTiff(matrix,please.burnDuration,$"{path}/ELMFIRE/input/{outputNames[i]}.tif",$"{path}/ELMFIRE/input/dem.tif",DataType.GDT_Float32);
+                        ModelSetup.CreateMultiBandGeoTiff(matrix,1,1,$"{path}/ELMFIRE/input/{outputNames[i]}.tif",$"{path}/ELMFIRE/input/dem.tif",DataType.GDT_Float32);
                     }
                     
                     string text = File.ReadAllText(path + @"ELMFIRE/run.sh");
-                    text = text.Replace("SIMULATION_TSTOP=32400.0", $"SIMULATION_TSTOP={please.burnDuration * 3600}");
-                    text = text.Replace("WX_READINGS=10", $"WX_READINGS={please.burnDuration}");
+                    text = text.Replace("SIMULATION_TSTOP=32400.0", $"SIMULATION_TSTOP={please.burnHours * 3600}");
                     text = text.Replace("XIGN=232043.4", $"XIGN={please.xIgnition_prj}");
                     text = text.Replace("YIGN=4215113.9", $"YIGN={please.yIgnition_prj}");
                     File.WriteAllText(path + @"ELMFIRE/run.sh", text);
@@ -354,7 +312,7 @@ namespace RoxCaseGen
                     break;
                 case "EPD":
                 case "LSTM":
-
+                    currTime = please.rawStartTime;
                     List<string> wxsOutput = new List<string>();
                     List<string> fmsOutput = new List<string>();
                     for (int i = 1; i < please.fmc.GetLength(0); i++)
@@ -365,14 +323,11 @@ namespace RoxCaseGen
                     wxsOutput.Add("RAWS_ELEVATION: 10"); //random value added for now. Maybe it is too high?
                     wxsOutput.Add("RAWS_UNITS: Metric"); //All values declared metric
                     wxsOutput.Add(
-                        $"RAWS: {(please.totalRAWSdays * 24).ToString()}"); //Calculate and declare how many weather points will follow
-                    for (int i = 0; i < please.totalRAWSdays; i++)
+                        $"RAWS: {(please.burnHours).ToString()}"); //Calculate and declare how many weather points will follow
+                    for (int i = 0; i < please.burnHours; i++)
                     {
-                        for (int j = 0; j < 24; j++)
-                        {
-                            wxsOutput.Add(
-                                $"{please.year} {please.month} {i + 1} {j * 100} {(int)please.tempProfile[j]} {(int)please.humidProfile[j]} 0.00 {(int)please.windMag} {please.windDir} 0");
-                        }
+                            wxsOutput.Add($"{currTime.Year.ToString("D")} {currTime.Month.ToString("D")} {currTime.Day.ToString("D")} {(currTime.Hour*100).ToString("D")} {(int)please.tempProfile[currTime.Hour]} {(int)please.humidProfile[currTime.Hour]} 0.00 {(int)please.windMag} {please.windDir} 0");
+                            currTime = currTime.AddHours(1);
                     }
 
                     File.WriteAllLines(path + "/" + model + "/Input/moisture.fms", fmsOutput.ToArray());
@@ -397,15 +352,15 @@ namespace RoxCaseGen
                 case "FDS LS4":
                     List<string> fdsWeather = new List<string>();
                     fdsWeather.Add("times,speed,direction");
-                    for (int i = 0; i < please.burnDuration; i++)
+                    for (int i = 0; i < please.burnHours; i++)
                     {
-                        fdsWeather.Add($"{i * 3600},{please.windMag / 3.6},{please.windDir}");
+                        fdsWeather.Add($"{i * 60},{please.windMag / 3.6},{please.windDir}");
                     }
 
                     File.WriteAllLines(path + "/" + model + "/Input/weather.csv", fdsWeather.ToArray());
 
                     string addCRStoPointCommand =
-                        @$" run native:reprojectlayer --distance_units=meters --area_units=m2 --ellipsoid=EPSG:7043 --INPUT='{path}/Farsite/Input/ROX.shp' --TARGET_CRS='EPSG:32235' --CONVERT_CURVED_GEOMETRIES=false --OPERATION= --OUTPUT='{path}/{model}/Input/ignition.shp'";
+                        @$" run native:reprojectlayer --distance_units=meters --area_units=m2 --ellipsoid=EPSG:7043 --INPUT='{path}/Farsite/Input/ROX.shp' --TARGET_CRS='EPSG:26712' --CONVERT_CURVED_GEOMETRIES=false --OPERATION= --OUTPUT='{path}/{model}/Input/ignition.shp'";
                     string qgisProcessorPromptPath = @"C:\Program Files\QGIS 3.34.11\bin/";
                     string[] commandsPoint = new string[]
                     {
@@ -431,9 +386,9 @@ namespace RoxCaseGen
                         @$"--tex_pixel_size={please.cellsize} " +
                         @$"--tex_layer='{path}/FDS LS1/Input/fuel13.tif' " +
                         @$"--nmesh=35 " +
-                        @$"--cell_size=90 " +
+                        @$"--cell_size={please.cellsize} " +
                         @$"--t_begin=0 " +
-                        @$"--t_end={please.burnDuration*3600} " +
+                        @$"--t_end={please.burnHours*60} " +
                         @$"--text_filepath= " +
                         $@"--UtmGrid=TEMPORARY_OUTPUT " + 
                         @$"--export_obst=true";
@@ -455,7 +410,7 @@ namespace RoxCaseGen
                         $"&REAC ID='Wood' SOOT_YIELD=0.005 O=2.5 C=3.4 H=6.2");
                     fdstext = fdstext.Replace("      LEVEL_SET_MODE=1 ", $"      LEVEL_SET_MODE={lsmode} ");
                     fdstext = fdstext.Replace("&WIND SPEED=1., RAMP_SPEED_T='ws', RAMP_DIRECTION_T='wd' /", $"&WIND SPEED=1., RAMP_SPEED='ws', RAMP_DIRECTION='wd' /");
-                    fdstext = fdstext.Replace("&TIME T_END=0. /", $"&TIME T_END={please.burnDuration * 3600} /");
+                    fdstext = fdstext.Replace("&TIME T_END=0. /", $"&TIME T_END={please.burnHours * 60} /");
                     for (int i = 0; i < please.fmc_A13.GetLength(0); i++)
                     {
                         fdstext = fdstext.Replace($"VEG_LSET_FUEL_INDEX={please.fmc_A13[i,0].ToString()} /",
@@ -512,7 +467,6 @@ namespace RoxCaseGen
             switch (model)
             {
                 case "Farsite":
-                    //
                     runCommand([$"cd '{path}Farsite'", $"./setenv.bat", "./bin/testFARSITE.exe ROX.txt"],
                         @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",";");
                     break;
@@ -571,7 +525,7 @@ namespace RoxCaseGen
                     {
                         WISEresults =
                             Directory.GetDirectories(@"C:\\jobs", "job_*", SearchOption.TopDirectoryOnly);
-                        Thread.Sleep(5000);
+                        Thread.Sleep(1000);
                     }
                     runCommand(["cd 'C:/Program Files/WISE/'",@$".\wise.exe -t '{WISEresults[0]}\job.fgmj'"],@"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",";");
                     
@@ -618,10 +572,10 @@ namespace RoxCaseGen
                     {
                         if (sw.BaseStream.CanWrite)
                         {
-                            sw.WriteLine(@"C:/Users/nikos/miniconda3/Scripts/activate.bat");
+                            sw.WriteLine(@"powershell -ExecutionPolicy ByPass -NoExit -Command ""& 'C:\Users\nikos\miniconda3\shell\condabin\conda-hook.ps1'""");
                             sw.WriteLine("conda activate newEnv");
                             sw.WriteLine(
-                                $"python D:/GoogleModel/wildfire_conv_ltsm/preprocessor.py california {model} \"{path}/{model}/Input\" {modelSetup.burnDuration} {modelSetup.xIgnition_raster} {modelSetup.yIgnition_raster} {modelSetup.year} {modelSetup.month} {modelSetup.totalRAWSdays - (int)(modelSetup.burnDuration / 24)} {23 - modelSetup.burnDuration % 24}00");
+                                $"python D:/GoogleModel/wildfire_conv_ltsm/preprocessor.py california {model} \"{path}/{model}/Input\" {modelSetup.burnHours} {modelSetup.xIgnition_raster} {modelSetup.yIgnition_raster} {modelSetup.rawStartTime.Year} {modelSetup.rawStartTime.Month} {modelSetup.rawStartTime.Day} {modelSetup.rawStartTime.Hour}00");
                             sw.WriteLine("exit");
                         }
                     }
