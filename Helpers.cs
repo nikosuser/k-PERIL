@@ -65,132 +65,132 @@ namespace RoxCaseGen
 {
     public class ModelSetup
     {
-        int maxTemp;
-        int minTemp;
-        int maxTime;
-        int minTime;
-        int maxHumid;
-        int minHumid;
+        int _maxTemp;
+        int _minTemp;
+        int _maxTime;
+        int _minTime;
+        int _maxHumid;
+        int _minHumid;
 
-        int varMaxTemp;
-        int varMinTemp;
-        int varMaxTime;
-        int varMinTime;
-        int varMaxHumid;
-        int varMinHumid;
+        int _varMaxTemp;
+        int _varMinTemp;
+        int _varMaxTime;
+        int _varMinTime;
+        int _varMaxHumid;
+        int _varMinHumid;
 
-        int avgWindMag;
-        int varAvgWindMag;
+        int _avgWindMag;
+        int _varAvgWindMag;
 
-        float actualMaxTemp;
-        float actualMinTemp;
-        float actualMaxTime;
-        float actualMinTime;
-        float actualMaxHumid;
-        float actualMinHumid;
+        public float ActualMaxTemp;
+        float _actualMinTemp;
+        float _actualMaxTime;
+        float _actualMinTime;
+        float _actualMaxHumid;
+        public float ActualMinHumid;
 
-        public float actualASET;
+        public float ActualAset;
 
-        public float windMag;
-        public int windDir;
+        public float WindMag;
+        public int WindDir;
 
-        public float[] humidProfile;
-        public float[] tempProfile;
+        public float[] HumidProfile;
+        public float[] TempProfile;
 
-        public DateTime rawStartTime;
+        public DateTime RawStartTime;
 
-        public int xIgnition_raster;
-        public int yIgnition_raster;
-        public int xIgnition_prj;
-        public int yIgnition_prj;
+        public int XIgnitionRaster;
+        public int YIgnitionRaster;
+        public int XIgnitionPrj;
+        public int YIgnitionPrj;
 
-        int IgnitionFuelModel;
+        int _ignitionFuelModel;
 
-        public int ASET;
-        public int varASET;
+        public int Aset;
+        public int VarAset;
 
-        public int[,] fuelMap;
+        public int[,] FuelMap;
 
-        public int burnHours;
-        public int conditioningDays;
+        public int BurnHours;
+        public int ConditioningDays;
         
-        public int[] fuelMoisture;
+        public int[] FuelMoisture;
 
-        public int cellsize;
+        public int Cellsize;
 
-        public List<PointF> WUI;
+        public List<PointF> Wui;
 
-        public int[,] fmc;
-        public int[,] fmc_A13;
+        public int[,] Fmc;
+        public int[,] FmcA13;
 
-        public void setValues(string Path)                                              //Reads the VARS.txt input file and passes the input variables to the class.
+        public void SetValues(string path)                                              //Reads the VARS.txt input file and passes the input variables to the class.
         {
-            float[,] fileInput = parseInputFilesToMemory(Path + "/Input/VARS.txt");      //read the file contents and store each line in an array element
+            float[,] fileInput = ParseInputFilesToMemory(path + "/Input/VARS.txt");      //read the file contents and store each line in an array element
 
             //set all the class variables below
-            this.maxTemp = (int)fileInput[0, 0];
-            this.minTemp = (int)fileInput[1, 0];
-            this.maxTime = (int)fileInput[2, 0];
-            this.minTime = (int)fileInput[3, 0];
-            this.maxHumid = (int)fileInput[4, 0];
-            this.minHumid = (int)fileInput[5, 0];
+            this._maxTemp = (int)fileInput[0, 0];
+            this._minTemp = (int)fileInput[1, 0];
+            this._maxTime = (int)fileInput[2, 0];
+            this._minTime = (int)fileInput[3, 0];
+            this._maxHumid = (int)fileInput[4, 0];
+            this._minHumid = (int)fileInput[5, 0];
 
-            this.varMaxTemp = (int)fileInput[6, 0];
-            this.varMinTemp = (int)fileInput[7, 0];
-            this.varMaxTime = (int)fileInput[8, 0];
-            this.varMinTime = (int)fileInput[9, 0];
-            this.varMaxHumid = (int)fileInput[10, 0];
-            this.varMinHumid = (int)fileInput[11, 0];
+            this._varMaxTemp = (int)fileInput[6, 0];
+            this._varMinTemp = (int)fileInput[7, 0];
+            this._varMaxTime = (int)fileInput[8, 0];
+            this._varMinTime = (int)fileInput[9, 0];
+            this._varMaxHumid = (int)fileInput[10, 0];
+            this._varMinHumid = (int)fileInput[11, 0];
 
-            this.avgWindMag = (int)fileInput[12, 0];
-            this.varAvgWindMag = (int)fileInput[13, 0];
-            this.ASET = (int)fileInput[fileInput.GetLength(0) - 2, 0];
-            this.varASET = (int)fileInput[fileInput.GetLength(0) - 1, 0];
+            this._avgWindMag = (int)fileInput[12, 0];
+            this._varAvgWindMag = (int)fileInput[13, 0];
+            this.Aset = (int)fileInput[fileInput.GetLength(0) - 2, 0];
+            this.VarAset = (int)fileInput[fileInput.GetLength(0) - 1, 0];
             //Console.WriteLine("Values Parsed!");
         }
 
-        public void randomizeValues()                                               //create the set of simulation parameters
+        public void RandomizeValues()                                               //create the set of simulation parameters
         {
-            this.actualMaxTemp = getRandNormal(maxTemp, varMaxTemp);
-            this.actualMinTemp = getRandNormal(minTemp, varMinTemp);
-            this.actualMaxTime = (int)getRandNormal(maxTime, varMaxTime) % 24;
-            this.actualMinTime = (int)getRandNormal(minTime, varMinTime) % 24;
-            this.actualMaxHumid = getRandNormal(maxHumid, varMaxHumid);
-            if (this.actualMaxHumid < 0)
+            this.ActualMaxTemp = GetRandNormal(_maxTemp, _varMaxTemp);
+            this._actualMinTemp = GetRandNormal(_minTemp, _varMinTemp);
+            this._actualMaxTime = (int)GetRandNormal(_maxTime, _varMaxTime) % 24;
+            this._actualMinTime = (int)GetRandNormal(_minTime, _varMinTime) % 24;
+            this._actualMaxHumid = GetRandNormal(_maxHumid, _varMaxHumid);
+            if (this._actualMaxHumid < 0)
             {
-                this.actualMaxHumid = 0;
+                this._actualMaxHumid = 0;
             }
-            if (this.actualMaxHumid > 100)
+            if (this._actualMaxHumid > 100)
             {
-                this.actualMaxHumid = 100;
+                this._actualMaxHumid = 100;
             }
-            this.actualMinHumid = getRandNormal(minHumid, varMinHumid);
-            if (this.actualMinHumid < 0)
+            this.ActualMinHumid = GetRandNormal(_minHumid, _varMinHumid);
+            if (this.ActualMinHumid < 0)
             {
-                this.actualMinHumid = 0;
+                this.ActualMinHumid = 0;
             }
-            if (this.actualMinHumid > 100)
+            if (this.ActualMinHumid > 100)
             {
-                this.actualMinHumid = 100;
+                this.ActualMinHumid = 100;
             }
-            while (this.actualMaxTemp < this.actualMinTemp)                         //make sure the Maximum temperature is larger than the minimum.
+            while (this.ActualMaxTemp < this._actualMinTemp)                         //make sure the Maximum temperature is larger than the minimum.
             {
-                this.actualMaxTemp = getRandNormal(maxTemp, varMaxTemp);
-                this.actualMinTemp = getRandNormal(minTemp, varMinTemp);
-            }
-
-            while (this.actualMaxHumid < this.actualMinHumid)                       //make sure the maximum humidity is larger than the minimum
-            {
-                this.actualMaxHumid = getRandNormal(maxHumid, varMaxHumid);
-                this.actualMinHumid = getRandNormal(minHumid, varMinHumid);
+                this.ActualMaxTemp = GetRandNormal(_maxTemp, _varMaxTemp);
+                this._actualMinTemp = GetRandNormal(_minTemp, _varMinTemp);
             }
 
-            this.windMag = getRandNormal(avgWindMag, varAvgWindMag);
-            this.actualASET=getRandNormal(ASET, varASET);
+            while (this._actualMaxHumid < this.ActualMinHumid)                       //make sure the maximum humidity is larger than the minimum
+            {
+                this._actualMaxHumid = GetRandNormal(_maxHumid, _varMaxHumid);
+                this.ActualMinHumid = GetRandNormal(_minHumid, _varMinHumid);
+            }
+
+            this.WindMag = GetRandNormal(_avgWindMag, _varAvgWindMag);
+            this.ActualAset=GetRandNormal(Aset, VarAset);
 
             //Console.WriteLine("Input Values Ransomised!");
         }
-        private float getRandNormal(float mean, float stdDev)                          //get random value based on standard deviation. This algorithm was shamelessly stolen from the internet, and is based on ____________ which gives you a random distribution using two completley random values.
+        private float GetRandNormal(float mean, float stdDev)                          //get random value based on standard deviation. This algorithm was shamelessly stolen from the internet, and is based on ____________ which gives you a random distribution using two completley random values.
         {
             Random rand = new Random(); //reuse this if you are generating many
             float u1 = (float)(1.0 - rand.NextDouble()); //uniform(0,1] random doubles
@@ -206,14 +206,14 @@ namespace RoxCaseGen
             }
             return randNormal;
         }
-        public void createTempAndHumidProfile()                                 //extrapolate the diurnal temperature and humidity profiles.
+        public void CreateTempAndHumidProfile()                                 //extrapolate the diurnal temperature and humidity profiles.
         {
-            int maxTime = (int)this.actualMaxTime;                              //get all the variables from the class (mostly because it is easier to write this way)
-            int minTime = (int)this.actualMinTime;
-            float maxTemp = this.actualMaxTemp;
-            float minTemp = this.actualMinTemp;
-            float maxHumid = this.actualMaxHumid;
-            float minHumid = this.actualMinHumid;
+            int maxTime = (int)this._actualMaxTime;                              //get all the variables from the class (mostly because it is easier to write this way)
+            int minTime = (int)this._actualMinTime;
+            float maxTemp = this.ActualMaxTemp;
+            float minTemp = this._actualMinTemp;
+            float maxHumid = this._actualMaxHumid;
+            float minHumid = this.ActualMinHumid;
 
             float[] tempProfile = new float[24];                                //declare output arrays of hourly temperature and humidity readings.
             float[] humidProfile = new float[24];
@@ -270,30 +270,30 @@ namespace RoxCaseGen
             }
 
 
-            this.tempProfile = tempProfile;                             //parse variables to class
-            this.humidProfile = humidProfile;
+            this.TempProfile = tempProfile;                             //parse variables to class
+            this.HumidProfile = humidProfile;
 
             //Console.WriteLine("Temperature and Humidity Profiles Created!");
         }
-        public void createAndWriteFileFARSITE(string Path)                     //create the input file required by the FARSITE console application.
+        public void CreateAndWriteFileFarsite(string path)                     //create the input file required by the FARSITE console application.
         {
             List<string> outputFile = new List<string>(); //[15 + 256 + this.totalRAWSdays * 24 + 20];           //instantiate the output array
             
-            DateTime currTime = this.rawStartTime;
+            DateTime currTime = this.RawStartTime;
             
-            outputFile.Add($"CONDITIONING_PERIOD_END: {(this.rawStartTime.AddHours(this.burnHours)).Month.ToString("D")} {(this.rawStartTime.AddHours(this.burnHours)).Day.ToString("D")} 2300");
-            outputFile.Add($"FUEL_MOISTURES_DATA: {this.fmc.GetLength(0)+1}");                                             //all the fuel moistures are the same and hardcoded below for now.
+            outputFile.Add($"CONDITIONING_PERIOD_END: {(this.RawStartTime.AddHours(this.BurnHours)).Month.ToString("D")} {(this.RawStartTime.AddHours(this.BurnHours)).Day.ToString("D")} 2300");
+            outputFile.Add($"FUEL_MOISTURES_DATA: {this.Fmc.GetLength(0)+1}");                                             //all the fuel moistures are the same and hardcoded below for now.
             outputFile.Add("0 6 7 8 60 90");
-            for (int i = 0; i < this.fmc.GetLength(0); i++)
+            for (int i = 0; i < this.Fmc.GetLength(0); i++)
             {
-                outputFile.Add($"{this.fmc[i,0]} {this.fmc[i,1]} {this.fmc[i,2]} {this.fmc[i,3]} {this.fmc[i,4]} {this.fmc[i,5]}");
+                outputFile.Add($"{this.Fmc[i,0]} {this.Fmc[i,1]} {this.Fmc[i,2]} {this.Fmc[i,3]} {this.Fmc[i,4]} {this.Fmc[i,5]}");
             }
-            outputFile.Add("RAWS_ELEVATION: 10");                                               //random value added for now. Maybe it is too high?
+            outputFile.Add($"RAWS_ELEVATION: {ModelSetup.GetElevation((int)this.XIgnitionRaster, (int)this.YIgnitionRaster, Path.GetDirectoryName(path) + "/elevation.asc")}");                                               //random value added for now. Maybe it is too high?
             outputFile.Add("RAWS_UNITS: Metric");                                                 //All values declared metric
-            outputFile.Add($"RAWS: {(this.burnHours+23).ToString()}");                   //Calculate and declare how many weather points will follow
-            for (int i = 0; i < this.burnHours+23; i++)                                          //Output all the weather data in FARSITE flavor. Precipitation is defaulted to 20%
+            outputFile.Add($"RAWS: {(this.BurnHours+23).ToString()}");                   //Calculate and declare how many weather points will follow
+            for (int i = 0; i < this.BurnHours+23; i++)                                          //Output all the weather data in FARSITE flavor. Precipitation is defaulted to 20%
             {
-                outputFile.Add($"{currTime.Year.ToString("D")} {currTime.Month.ToString("D")} {currTime.Day.ToString("D")} {(currTime.Hour*100).ToString("D")} {(int)this.tempProfile[currTime.Hour]} {(int)this.humidProfile[currTime.Hour]} 0.00 {(int)this.windMag} {this.windDir} 0");
+                outputFile.Add($"{currTime.Year.ToString("D")} {currTime.Month.ToString("D")} {currTime.Day.ToString("D")} {(currTime.Hour*100).ToString("D")} {(int)this.ActualMaxTemp} {(int)this.ActualMinHumid} 0.00 {(int)this.WindMag} {this.WindDir} 0");
                 currTime = currTime.AddHours(1);
             }
             //THe FARSITE simulations will happen with the below parameters. They are currently hardcoded. Notice how GRIDDED WIND is being used here.
@@ -302,8 +302,8 @@ namespace RoxCaseGen
             outputFile.Add("NUMBER_PROCESSORS: 32");
             outputFile.Add("GRIDDED_WINDS_GENERATE: Yes");
             outputFile.Add("GRIDDED_WINDS_RESOLUTION: 10.0");
-            outputFile.Add($"FARSITE_START_TIME: {this.rawStartTime.Month.ToString("D")} {this.rawStartTime.Day.ToString("D")} {this.rawStartTime.Hour.ToString("D")}00"); 
-            outputFile.Add($"FARSITE_END_TIME: {(this.rawStartTime.AddHours(this.burnHours)).Month.ToString("D")} {(this.rawStartTime.AddHours(this.burnHours)).Day.ToString("D")} {(this.rawStartTime.AddHours(this.burnHours)).Hour.ToString("D")}00");
+            outputFile.Add($"FARSITE_START_TIME: {this.RawStartTime.Month.ToString("D")} {this.RawStartTime.Day.ToString("D")} {this.RawStartTime.Hour.ToString("D")}00"); 
+            outputFile.Add($"FARSITE_END_TIME: {(this.RawStartTime.AddHours(this.BurnHours)).Month.ToString("D")} {(this.RawStartTime.AddHours(this.BurnHours)).Day.ToString("D")} {(this.RawStartTime.AddHours(this.BurnHours)).Hour.ToString("D")}00");
             outputFile.Add("FARSITE_TIMESTEP: 60");
             outputFile.Add("FARSITE_DISTANCE_RES: 60.0");
             outputFile.Add("FARSITE_PERIMETER_RES: 60.0");
@@ -314,38 +314,40 @@ namespace RoxCaseGen
             outputFile.Add("FARSITE_MINIMUM_SPOT_DISTANCE: 60");
             outputFile.Add("FARSITE_ACCELERATION_ON: 1");
 
-            File.WriteAllLines(Path + "ROX.input", outputFile.ToArray());
+            File.WriteAllLines(path + "ROX.input", outputFile.ToArray());
 
             //Console.WriteLine("Input File Created!");
         }
 
-        public void createAndWriteFileFLAMMAP(string Path)                     //create the input file required by the FARSITE console application.
+        public void CreateAndWriteFileFlammap(string path)                     //create the input file required by the FARSITE console application.
         {
             List<string> outputFile = new List<string>(); //[15 + 256 + this.totalRAWSdays * 24 + 20];           //instantiate the output array
-            DateTime currTime = this.rawStartTime;
+            DateTime currTime = this.RawStartTime;
 
-            outputFile.Add($"CONDITIONING_PERIOD_END: {(this.rawStartTime.AddDays(this.conditioningDays)).Month.ToString("D")} {(this.rawStartTime.AddDays(this.conditioningDays)).Day.ToString("D")} {(this.rawStartTime.AddDays(this.conditioningDays)).Hour.ToString("D")}00");
+            outputFile.Add($"CONDITIONING_PERIOD_END: {(this.RawStartTime.AddDays(this.ConditioningDays)).Month.ToString("D")} {(this.RawStartTime.AddDays(this.ConditioningDays)).Day.ToString("D")} {(this.RawStartTime.AddDays(this.ConditioningDays).AddHours(16)).Hour.ToString("D")}00");
 
             outputFile.Add("FUEL_MOISTURES_DATA: 255");                                             //all the fuel moistures are the same and hardcoded below for now.
             for (int i = 1; i < 256; i++)
             {
-                outputFile.Add((i - 1).ToString() + $" {this.fuelMoisture[0]} {this.fuelMoisture[1]} {this.fuelMoisture[2]} {this.fuelMoisture[3]} {this.fuelMoisture[4]}");
+                outputFile.Add((i - 1).ToString() + $" {this.FuelMoisture[0]} {this.FuelMoisture[1]} {this.FuelMoisture[2]} {this.FuelMoisture[3]} {this.FuelMoisture[4]}");
             }
-            outputFile.Add("RAWS_ELEVATION: 10");                                               
+
+            outputFile.Add(
+                $"RAWS_ELEVATION: {ModelSetup.GetElevation((int)this.XIgnitionRaster, (int)this.YIgnitionRaster, Path.GetDirectoryName(path) + "/Input/elevation.asc")}");                                           
             outputFile.Add("RAWS_UNITS: Metric"); 
             outputFile.Add("WIND_SPEED_UNITS: 1"); //All values declared metric
-            outputFile.Add($"RAWS: {((this.conditioningDays + 1) * 24).ToString()}");                   //Calculate and declare how many weather points will follow
-            for (int i = 0; i < (this.conditioningDays + 1) * 24; i++)                                          //Output all the weather data in FARSITE flavor. Precipitation is defaulted to 20%
+            outputFile.Add($"RAWS: {((this.ConditioningDays + 1) * 24).ToString()}");                   //Calculate and declare how many weather points will follow
+            for (int i = 0; i < (this.ConditioningDays + 1) * 24; i++)                                          //Output all the weather data in FARSITE flavor. Precipitation is defaulted to 20%
             {
-                outputFile.Add($"{currTime.Year.ToString("D")} {currTime.Month.ToString("D")} {currTime.Day.ToString("D")} {(currTime.Hour*100).ToString("D")} {(int)this.tempProfile[currTime.Hour]} {(int)this.humidProfile[currTime.Hour]} 0.00 {(int)this.windMag} {this.windDir} 0");
+                outputFile.Add($"{currTime.Year.ToString("D")} {currTime.Month.ToString("D")} {currTime.Day.ToString("D")} {(currTime.Hour*100).ToString("D")} {(int)this.TempProfile[currTime.Hour]} {(int)this.HumidProfile[currTime.Hour]} 0.00 {(int)this.WindMag} {this.WindDir} 0");
                 currTime = currTime.AddHours(1);
             }
             //THe FARSITE simulations will happen with the below parameters. They are currently hardcoded. Notice how GRIDDED WIND is being used here.
             outputFile.Add("FOLIAR_MOISTURE_CONTENT: 80");
             outputFile.Add("CROWN_FIRE_METHOD: Finney");
             outputFile.Add("NUMBER_PROCESSORS: 16");
-            outputFile.Add($"WIND_SPEED: {this.windMag}");
-            outputFile.Add($"WIND_DIRECTION: {this.windDir}");
+            outputFile.Add($"WIND_SPEED: {this.WindMag}");
+            outputFile.Add($"WIND_DIRECTION: {this.WindDir}");
             outputFile.Add("SPREAD_DIRECTION_FROM_MAX: 0");
             outputFile.Add("GRIDDED_WINDS_GENERATE: Yes");
             outputFile.Add("GRIDDED_WINDS_RESOLUTION: 30.0");
@@ -357,7 +359,7 @@ namespace RoxCaseGen
             outputFile.Add("FUELMOISTURE100:");
             outputFile.Add("FUELMOISTURE1000:");
 
-            File.WriteAllLines(Path, outputFile.ToArray());
+            File.WriteAllLines(path, outputFile.ToArray());
 
             //Console.WriteLine("Input File Created!");
         }
@@ -379,24 +381,24 @@ namespace RoxCaseGen
         
         public static float[,] readASC_float(string path)              //Read FARSITE output files, delete the first 6 lines as they do not contain useful information (for this program)
         {
-            string[] FileRawInput = File.ReadAllLines(path);
-            List<string> ParsedInput = FileRawInput.ToList();
-            ParsedInput.RemoveRange(0, 6);
-            FileRawInput = ParsedInput.ToArray();
+            string[] fileRawInput = File.ReadAllLines(path);
+            List<string> parsedInput = fileRawInput.ToList();
+            parsedInput.RemoveRange(0, 6);
+            fileRawInput = parsedInput.ToArray();
  
-            return parseFile(FileRawInput); //return the output matrix
+            return ParseFile(fileRawInput); //return the output matrix
         }
 
         public float[,] readSafetyMatrix_float(string path)              //Read FARSITE output files, delete the first 6 lines as they do not contain useful information (for this program)
         {
-            string[] FileRawInput = File.ReadAllLines(path);
-            List<string> ParsedInput = FileRawInput.ToList();
-            FileRawInput = ParsedInput.ToArray();
+            string[] fileRawInput = File.ReadAllLines(path);
+            List<string> parsedInput = fileRawInput.ToList();
+            fileRawInput = parsedInput.ToArray();
 
-            return parseFile(FileRawInput);                                                //return the output matrix
+            return ParseFile(fileRawInput);                                                //return the output matrix
         }
 
-        private static float[,] parseFile(string[] input)                          //This code is also shamelessly stolen from the internet to convert a raster from a string array format (as is done by reading a file) to a 2D numeric array..
+        private static float[,] ParseFile(string[] input)                          //This code is also shamelessly stolen from the internet to convert a raster from a string array format (as is done by reading a file) to a 2D numeric array..
         {
             var arrays = new List<float[]>();
 
@@ -422,7 +424,7 @@ namespace RoxCaseGen
             var numberOfValues = arrays.Sum(s => s.Length);                 //save the total number of values in arrays (i.e. all elements)
 
             int minorLength = arrays[0].Length;                             //create a variable to save the minor dimension of the arrays variable
-            float[,] NumOut = new float[arrays.Count, minorLength];         //create output matrix
+            float[,] numOut = new float[arrays.Count, minorLength];         //create output matrix
             for (int i = 0; i < arrays.Count; i++)                          //for all elements in arrays
             {
                 var array = arrays[i];                                      //save the array in the arrays element
@@ -430,18 +432,18 @@ namespace RoxCaseGen
                 {
                     try
                     {
-                        NumOut[i, j] = array[j];
+                        numOut[i, j] = array[j];
                     }
                     catch
                     {
-                        NumOut[i, j] = 0;
+                        numOut[i, j] = 0;
                     }                         //place each element in the output matrix
                 }
             }
-            return NumOut;
+            return numOut;
         }
 
-        public float[,] parseInputFilesToMemory(string filePath)                //Read input files that are not farsite data (so no need to delete the first 6 lines)
+        public float[,] ParseInputFilesToMemory(string filePath)                //Read input files that are not farsite data (so no need to delete the first 6 lines)
         {
             List<string> lines = new List<string>();
 
@@ -468,10 +470,10 @@ namespace RoxCaseGen
             //List<string> ParsedInput = FileRawInput.ToList();
             //FileRawInput = ParsedInput.ToArray();
 
-            return parseFile(linesArray);                                                  //return the output matrix
+            return ParseFile(linesArray);                                                  //return the output matrix
         }
 
-        public static void cleanupIters(string directoryPath)
+        public static void CleanupIters(string directoryPath)
         {
             // Pattern to match folders in the form IterXXX
             string folderPattern = @"^Iter\d{3}$";
@@ -512,9 +514,9 @@ namespace RoxCaseGen
             foreach(var directory in Directory.GetDirectories(sourceDir))
                 Copy(directory, Path.Combine(targetDir, Path.GetFileName(directory)));
         }
-        public static void Output_ASC_File(string[] header, float[,] boundary, string PerilOutput)      //output variable to a new text file, shamelessly stolen
+        public static void Output_ASC_File(string[] header, float[,] boundary, string perilOutput)      //output variable to a new text file, shamelessly stolen
         {
-            using (var sw = new StreamWriter(PerilOutput))  //beyond here the code has been shamelessly stolen
+            using (var sw = new StreamWriter(perilOutput))  //beyond here the code has been shamelessly stolen
             {
                 for (int i = 0; i < header.Length; i++)
                 {
@@ -532,9 +534,9 @@ namespace RoxCaseGen
                 sw.Close();                                 //close opened output text file
             }
         }
-        public static void Output_ASC_File(string[] header, int[,] boundary, string PerilOutput)      //output variable to a new text file, shamelessly stolen
+        public static void Output_ASC_File(string[] header, int[,] boundary, string perilOutput)      //output variable to a new text file, shamelessly stolen
         {
-            using (var sw = new StreamWriter(PerilOutput))  //beyond here the code has been shamelessly stolen
+            using (var sw = new StreamWriter(perilOutput))  //beyond here the code has been shamelessly stolen
             {
                 for (int i = 0; i < header.Length; i++)
                 {
@@ -554,9 +556,9 @@ namespace RoxCaseGen
             }
         }
 
-        public void OutputColumnFile(int[,] boundary, string PerilOutput)      //output variable to a new text file, shamelessly stolen
+        public void OutputColumnFile(int[,] boundary, string perilOutput)      //output variable to a new text file, shamelessly stolen
         {
-            using (var sw = new StreamWriter(PerilOutput))  //beyond here the code has been shamelessly stolen
+            using (var sw = new StreamWriter(perilOutput))  //beyond here the code has been shamelessly stolen
             {
                 for (int i = 0; i < boundary.GetLength(0); i++)   //for all elements in the output array
                 {
@@ -571,7 +573,7 @@ namespace RoxCaseGen
             }
         }
 
-        static private float PointDistance(int x1, int y1, int x2, int y2)
+        private static float PointDistance(int x1, int y1, int x2, int y2)
         {
             // Calculate the distance between (x1, y1) and (x2, y2) using the Euclidean distance formula
             float deltaX = x1 - x2;
@@ -645,41 +647,41 @@ namespace RoxCaseGen
             int maxYcoord = (int)(yllcorner+cellsize*nrows);
             int minYcoord = (int)yllcorner;
             
-            PointF WUIcenter = GetCentroid(this.WUI);
+            PointF wuIcenter = GetCentroid(this.Wui);
 
-            this.xIgnition_raster = (int)((rand.NextDouble()*0.8+0.1) * ncols);        //get random ignition location
-            this.yIgnition_raster = (int)((rand.NextDouble()*0.8+0.1) * nrows);         //avoid the absolute boundaries of the landscape
+            this.XIgnitionRaster = (int)((rand.NextDouble()*0.8+0.1) * ncols);        //get random ignition location
+            this.YIgnitionRaster = (int)((rand.NextDouble()*0.8+0.1) * nrows);         //avoid the absolute boundaries of the landscape
 
-            this.IgnitionFuelModel = (int)this.fuelMap[this.yIgnition_raster, this.xIgnition_raster];      //find the fuel inside the ignition point
+            this._ignitionFuelModel = (int)this.FuelMap[this.YIgnitionRaster, this.XIgnitionRaster];      //find the fuel inside the ignition point
 
-            while (this.IgnitionFuelModel == -9999 || this.IgnitionFuelModel == 91 || this.IgnitionFuelModel == 92 || this.IgnitionFuelModel == 93 || this.IgnitionFuelModel == 98 || this.IgnitionFuelModel == 99 || PointDistance(this.xIgnition_raster,this.yIgnition_raster,(int)WUIcenter.X, (int)WUIcenter.Y) < Math.Min(ncols / 3, nrows / 3) ) //if the ignition point has nonfuel on it, or is outside the designated area, retry
+            while (this._ignitionFuelModel == -9999 || this._ignitionFuelModel == 91 || this._ignitionFuelModel == 92 || this._ignitionFuelModel == 93 || this._ignitionFuelModel == 98 || this._ignitionFuelModel == 99 || PointDistance(this.XIgnitionRaster,this.YIgnitionRaster,(int)wuIcenter.X, (int)wuIcenter.Y) < Math.Min(ncols / 3, nrows / 3) ) //if the ignition point has nonfuel on it, or is outside the designated area, retry
             {
-                this.xIgnition_raster = (int)((rand.NextDouble()*0.8+0.1) * ncols);
-                this.yIgnition_raster = (int)((rand.NextDouble()*0.8+0.1) * nrows);
-                this.IgnitionFuelModel = (int)this.fuelMap[this.yIgnition_raster, this.xIgnition_raster];
+                this.XIgnitionRaster = (int)((rand.NextDouble()*0.8+0.1) * ncols);
+                this.YIgnitionRaster = (int)((rand.NextDouble()*0.8+0.1) * nrows);
+                this._ignitionFuelModel = (int)this.FuelMap[this.YIgnitionRaster, this.XIgnitionRaster];
             }
 
-            double[] proportionalIgnitionPoint = new double[2] { (float)this.xIgnition_raster / (float)ncols, (float)this.yIgnition_raster / (float)nrows };  //convert from raster values to proportional/nondimensional values (0-1 progress from the origin)
+            double[] proportionalIgnitionPoint = new double[2] { (float)this.XIgnitionRaster / (float)ncols, (float)this.YIgnitionRaster / (float)nrows };  //convert from raster values to proportional/nondimensional values (0-1 progress from the origin)
             
             if (randWind)
             {
-                this.windDir = (int)(rand.NextDouble() * 360);
+                this.WindDir = (int)(rand.NextDouble() * 360);
             }
             else
             {
-                this.windDir = (90 + (int)((180 / Math.PI) * Math.Atan2((this.yIgnition_raster - (int)WUIcenter.Y), (this.xIgnition_raster - (int)WUIcenter.X))))%360;   //calculate the wind direction to point towards the center of the raster. 
-                if (this.windDir < 0){windDir += 360;}
+                this.WindDir = (90 + (int)((180 / Math.PI) * Math.Atan2((this.YIgnitionRaster - (int)wuIcenter.Y), (this.XIgnitionRaster - (int)wuIcenter.X))))%360;   //calculate the wind direction to point towards the center of the raster. 
+                if (this.WindDir < 0){WindDir += 360;}
             }
 
-            this.xIgnition_prj = (int)(minXcoord + (maxXcoord - minXcoord) * proportionalIgnitionPoint[0]);
-            this.yIgnition_prj = (int)(maxYcoord - (maxYcoord - minYcoord) * proportionalIgnitionPoint[1]);
+            this.XIgnitionPrj = (int)(minXcoord + (maxXcoord - minXcoord) * proportionalIgnitionPoint[0]);
+            this.YIgnitionPrj = (int)(maxYcoord - (maxYcoord - minYcoord) * proportionalIgnitionPoint[1]);
             
-            return [this.xIgnition_prj, this.yIgnition_prj];
+            return [this.XIgnitionPrj, this.YIgnitionPrj];
         }
-        public void saveUsedData(string Path)                   //dump the used values of each case to a log file.
+        public void SaveUsedData(string pathIn)                   //dump the used values of each case to a log file.
         {
-            string output = $"{this.windMag} {this.windDir} {this.actualMaxHumid} {this.actualMaxTemp} {this.actualMaxTime} {this.actualMinHumid} {this.actualMinTemp} {this.actualMinTime} {this.xIgnition_raster} {this.yIgnition_raster} {this.IgnitionFuelModel} {this.actualASET}";        //dump all the values in a string
-            string path = Path + "/log.txt";
+            string output = $"{this.WindMag} {this.WindDir} {this._actualMaxHumid} {this.ActualMaxTemp} {this._actualMaxTime} {this.ActualMinHumid} {this._actualMinTemp} {this._actualMinTime} {this.XIgnitionRaster} {this.YIgnitionRaster} {this._ignitionFuelModel} {this.ActualAset}";        //dump all the values in a string
+            string path = pathIn + "/log.txt";
             if (!File.Exists(path))
             {
                 using (StreamWriter sw = File.CreateText(path))
@@ -688,18 +690,18 @@ namespace RoxCaseGen
                 }
             }
             Console.WriteLine("ITERATION VARIABLES:");
-            Console.WriteLine($"Wind Magnitude: {this.windMag:0.0#} km/h");
-            Console.WriteLine($"Wind Direction: {this.windDir:0.0#} from the vertical counterclockwise (because flammap?)");
-            Console.WriteLine($"Maximum Humidity: {this.actualMaxHumid:0.0#} %");
-            Console.WriteLine($"Maximum Temperature: {this.actualMaxTemp:0.0#} oC");
-            Console.WriteLine($"Time of Max Temperature: {this.actualMaxTime:0.0#} HH");
-            Console.WriteLine($"Minimum Humidity: {this.actualMinHumid:0.0#} %");
-            Console.WriteLine($"Minimum Temperature: {this.actualMinTemp:0.0#} oC");
-            Console.WriteLine($"Time of Min Temperature: {this.actualMinTime:0.0#} HH");
-            Console.WriteLine($"Ignition X-coordinate: {this.xIgnition_raster:0.0#} ");
-            Console.WriteLine($"Ignition Y-Coordinate: {this.yIgnition_raster:0.0#} ");
-            Console.WriteLine($"Ignition Fuel Model: {this.IgnitionFuelModel:0.0#} ");
-            Console.WriteLine($"ASET: {this.actualASET:0.0#} min");
+            Console.WriteLine($"Wind Magnitude: {this.WindMag:0.0#} km/h");
+            Console.WriteLine($"Wind Direction: {this.WindDir:0.0#} from the vertical counterclockwise (because flammap?)");
+            Console.WriteLine($"Maximum Humidity: {this._actualMaxHumid:0.0#} %");
+            Console.WriteLine($"Maximum Temperature: {this.ActualMaxTemp:0.0#} oC");
+            Console.WriteLine($"Time of Max Temperature: {this._actualMaxTime:0.0#} HH");
+            Console.WriteLine($"Minimum Humidity: {this.ActualMinHumid:0.0#} %");
+            Console.WriteLine($"Minimum Temperature: {this._actualMinTemp:0.0#} oC");
+            Console.WriteLine($"Time of Min Temperature: {this._actualMinTime:0.0#} HH");
+            Console.WriteLine($"Ignition X-coordinate: {this.XIgnitionRaster:0.0#} ");
+            Console.WriteLine($"Ignition Y-Coordinate: {this.YIgnitionRaster:0.0#} ");
+            Console.WriteLine($"Ignition Fuel Model: {this._ignitionFuelModel:0.0#} ");
+            Console.WriteLine($"ASET: {this.ActualAset:0.0#} min");
             Console.WriteLine("---------------------------------------");
             using (StreamWriter sw = File.AppendText(path))
             {
@@ -708,41 +710,41 @@ namespace RoxCaseGen
             }
             //Console.WriteLine("Log File Created!");
         }
-        public void WriteStarterFileFARSITE(string Path)               //Write a file that is needed for FARSITE to start. Should not be changed.
+        public void WriteStarterFileFarsite(string path)               //Write a file that is needed for FARSITE to start. Should not be changed.
         {
-            string output = $"{Path}Input/INPUT.lcp {Path}ROX.input {Path}ROX.shp 0 {Path}Median_Outputs/ 1";
-            string path = Path + "/Farsite/ROX.txt";
-            if (File.Exists(path)) { File.Delete(path); }
-            using (StreamWriter sw = File.CreateText(path))
+            string output = $"{path}Input/INPUT.lcp {path}ROX.input {path}ROX.shp 0 {path}Median_Outputs/ 1";
+            string writepath = path + "/Farsite/ROX.txt";
+            if (File.Exists(writepath)) { File.Delete(writepath); }
+            using (StreamWriter sw = File.CreateText(writepath))
             {
                 sw.WriteLine(output);
             }
         }
 
-        public void WriteStarterFileFLAMMAP(string Path)               //Write a file that is needed for FARSITE to start. Should not be changed.
+        public void WriteStarterFileFlammap(string path)               //Write a file that is needed for FARSITE to start. Should not be changed.
         {
-            string output = $"{Path}Input/INPUT.lcp {Path}ROX.input {Path}Median_Outputs/ 0";
-            string path = Path + "/ROX.txt";
-            if (File.Exists(path)) { File.Delete(path); }
-            using (StreamWriter sw = File.CreateText(path))
+            string output = $"{path}Input/INPUT.lcp {path}ROX.input {path}Median_Outputs/ 0";
+            string writepath = path + "/ROX.txt";
+            if (File.Exists(writepath)) { File.Delete(writepath); }
+            using (StreamWriter sw = File.CreateText(writepath))
             {
                 sw.WriteLine(output);
             }
         }
-        public float demo_CalcConvergence(int currentIteration, string Path)
+        public float demo_CalcConvergence(int currentIteration, string path)
         {
-            float[,] previousOutput = readASC_float(Path + $"/Output/ProbabilisticTriggerBoundary.asc");
-            float[,] currentSF = readASC_float(Path + $"/Output/TriggerBoundary_{currentIteration}.asc");
+            float[,] previousOutput = readASC_float(path + $"/Output/ProbabilisticTriggerBoundary.asc");
+            float[,] currentSf = readASC_float(path + $"/Output/TriggerBoundary_{currentIteration}.asc");
 
-            float[,] currentOutput = new float[currentSF.GetLength(0), currentSF.GetLength(1)];
+            float[,] currentOutput = new float[currentSf.GetLength(0), currentSf.GetLength(1)];
 
-            for (int i = 0;i<currentSF.GetLength(0); i++)
+            for (int i = 0;i<currentSf.GetLength(0); i++)
             {
-                for (int j = 0; j<currentSF.GetLength(1); j++)
+                for (int j = 0; j<currentSf.GetLength(1); j++)
                 {
                     if (previousOutput[i, j] < 0){previousOutput[i, j] = 0;}
-                    if (currentSF[i, j] < 0){currentSF[i, j] = 0;}
-                    currentOutput[i, j] = previousOutput[i, j] + currentSF[i, j];
+                    if (currentSf[i, j] < 0){currentSf[i, j] = 0;}
+                    currentOutput[i, j] = previousOutput[i, j] + currentSf[i, j];
                 }
             }
 
@@ -765,20 +767,20 @@ namespace RoxCaseGen
 
             return maxError;
         }
-        public float CalcConvergence(int currentIteration, string Path, string model)
+        public float CalcConvergence(int currentIteration, string path, string model)
         {
-            float[,] previousOutput = readASC_float(Path + $"Outputs/SafetyMatrix_{model}.txt");
-            float[,] currentSF = readASC_float(Path + $"Outputs/SafetyMatrix_{model}_" + currentIteration.ToString() + ".txt");
+            float[,] previousOutput = readASC_float(path + $"Outputs/SafetyMatrix_{model}.txt");
+            float[,] currentSf = readASC_float(path + $"Outputs/SafetyMatrix_{model}_" + currentIteration.ToString() + ".txt");
 
-            float[,] currentOutput = new float[currentSF.GetLength(0), currentSF.GetLength(1)];
+            float[,] currentOutput = new float[currentSf.GetLength(0), currentSf.GetLength(1)];
 
-            for (int i = 0;i<currentSF.GetLength(0); i++)
+            for (int i = 0;i<currentSf.GetLength(0); i++)
             {
-                for (int j = 0; j<currentSF.GetLength(1); j++)
+                for (int j = 0; j<currentSf.GetLength(1); j++)
                 {
                     if (previousOutput[i, j] < 0){previousOutput[i, j] = 0;}
-                    if (currentSF[i, j] < 0){currentSF[i, j] = 0;}
-                    currentOutput[i, j] = previousOutput[i, j] - currentSF[i, j];
+                    if (currentSf[i, j] < 0){currentSf[i, j] = 0;}
+                    currentOutput[i, j] = previousOutput[i, j] - currentSf[i, j];
                 }
             }
 
@@ -817,7 +819,7 @@ namespace RoxCaseGen
 
             return slice;
         }
-        public static double[] convertCoords(double utmX, double utmY, int utmZone, bool isNorthernHemisphere)
+        public static double[] ConvertCoords(double utmX, double utmY, int utmZone, bool isNorthernHemisphere)
         {
             var utm = ProjectedCoordinateSystem.WGS84_UTM(utmZone, isNorthernHemisphere);
             var geographic = GeographicCoordinateSystem.WGS84;
@@ -831,13 +833,13 @@ namespace RoxCaseGen
             return wgs84;
         }
 
-        public static float getElevation(int x, int y, string path)
+        public static float GetElevation(int x, int y, string path)
         {
             float[,] elevation = ModelSetup.readASC_float(path);
             return elevation[x, y];
         }
 
-        public static string[] getHeader(string filePath)
+        public static string[] GetHeader(string filePath)
         {
             if (!File.Exists(filePath))
                 throw new FileNotFoundException($"The file {filePath} does not exist.");
@@ -856,7 +858,7 @@ namespace RoxCaseGen
             }
             return headerLines;
         }
-        public static float[,] readTiff(string filePath)
+        public static float[,] ReadTiff(string filePath)
         {
             GdalBase.ConfigureAll();
             Gdal.AllRegister();
@@ -915,7 +917,7 @@ namespace RoxCaseGen
             return new PointF(centerX / accumulatedArea, centerY / accumulatedArea);
         }
 
-        public static void prepareNextIteration(string path)
+        public static void PrepareNextIteration(string path)
         {
             string[] prevResultFolders =
             {
@@ -1011,21 +1013,21 @@ namespace RoxCaseGen
         public int[] InitialiseIterationAndGetIgnition(string path)
         {
             int[] coordinates = SelectIgnitionPoint(path + "/Farsite/Input/", false); //choose ignition coordinates
-            randomizeValues(); //randomise the weather and wind values
-            saveUsedData(path); //dump the selected variables in log.txt
-            createTempAndHumidProfile(); //extrapolate diurnal temperature and humidity profiles
+            RandomizeValues(); //randomise the weather and wind values
+            SaveUsedData(path); //dump the selected variables in log.txt
+            CreateTempAndHumidProfile(); //extrapolate diurnal temperature and humidity profiles
             return coordinates;
         }
 
-        public void GetFMC(string path)
+        public void GetFmc(string path)
         {
-            createAndWriteFileFLAMMAP(path + "/Farsite/inputFLAMMAP.input");
-            RunModels.runCommand([$"cd '{path}Farsite'", $"./setenv.bat", "./bin/testFLAMMAP.exe FLAMMAP.txt"],
+            CreateAndWriteFileFlammap(path + "/Farsite/inputFLAMMAP.input");
+            RunModels.RunCommand([$"cd '{path}Farsite'", $"./setenv.bat", "./bin/testFLAMMAP.exe FLAMMAP.txt"],
                 @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",";");
             
             while(!File.Exists(path + "Farsite/Median_Outputs/FLAMMAP_FUELMOISTURE1.asc")){Thread.Sleep(200);}
 
-            int[] fuelsPresent = this.fuelMap
+            int[] fuelsPresent = this.FuelMap
                 .Cast<int>()
                 .Where(fuel => fuel != -9999) // exclude -9999
                 .Distinct()
@@ -1040,27 +1042,27 @@ namespace RoxCaseGen
                 .ToArray();
             float[,]fuelMoistures13 = new float[fuelsPresent13.Length,4];
             
-            float[,] hour1fmc = readASC_float(path + @"Farsite/Median_Outputs/FLAMMAP_FUELMOISTURE1.asc");
-            float[,] hour10fmc = readASC_float(path + @"Farsite/Median_Outputs/FLAMMAP_FUELMOISTURE10.asc");
-            float[,] hour100fmc = readASC_float(path + @"Farsite/Median_Outputs/FLAMMAP_FUELMOISTURE100.asc");
+            float[,] hour1Fmc = readASC_float(path + @"Farsite/Median_Outputs/FLAMMAP_FUELMOISTURE1.asc");
+            float[,] hour10Fmc = readASC_float(path + @"Farsite/Median_Outputs/FLAMMAP_FUELMOISTURE10.asc");
+            float[,] hour100Fmc = readASC_float(path + @"Farsite/Median_Outputs/FLAMMAP_FUELMOISTURE100.asc");
 
-            for (int i = 0; i < this.fuelMap.GetLength(0); i++)
+            for (int i = 0; i < this.FuelMap.GetLength(0); i++)
             {
-                for (int j = 0; j < this.fuelMap.GetLength(1); j++)
+                for (int j = 0; j < this.FuelMap.GetLength(1); j++)
                 {
-                    if (hour1fmc[i, j] > 0 && hour10fmc[i, j] > 0 && hour100fmc[i, j] > 0 && fuelmap13[i,j] > 0 )
+                    if (hour1Fmc[i, j] > 0 && hour10Fmc[i, j] > 0 && hour100Fmc[i, j] > 0 && fuelmap13[i,j] > 0 )
                     {
-                        int loc = Array.IndexOf(fuelsPresent,this.fuelMap[i, j]);
+                        int loc = Array.IndexOf(fuelsPresent,this.FuelMap[i, j]);
                         fuelMoistures[loc,0] ++;
-                        fuelMoistures[loc,1] += hour1fmc[i,j];
-                        fuelMoistures[loc,2] += hour10fmc[i,j];
-                        fuelMoistures[loc,3] += hour100fmc[i,j];
+                        fuelMoistures[loc,1] += hour1Fmc[i,j];
+                        fuelMoistures[loc,2] += hour10Fmc[i,j];
+                        fuelMoistures[loc,3] += hour100Fmc[i,j];
                     
                         int loc2 = Array.IndexOf(fuelsPresent13,fuelmap13[i, j]);
                         fuelMoistures13[loc2,0] ++;
-                        fuelMoistures13[loc2,1] += hour1fmc[i,j];
-                        fuelMoistures13[loc2,2] += hour10fmc[i,j];
-                        fuelMoistures13[loc2,3] += hour100fmc[i,j];
+                        fuelMoistures13[loc2,1] += hour1Fmc[i,j];
+                        fuelMoistures13[loc2,2] += hour10Fmc[i,j];
+                        fuelMoistures13[loc2,3] += hour100Fmc[i,j];
                         
                     } 
                 }
@@ -1079,11 +1081,10 @@ namespace RoxCaseGen
                 {
                     if (fmcOut[i,j] <= 0){fmcOut[i,j] = 4;}
                 }
-                
             }
             //remmeber to alter the FMC creation function
             
-            this.fmc = fmcOut;
+            this.Fmc = fmcOut;
             
             int[,] fmcOut13 = new int [fuelsPresent13.Length,6];
             for (int i = 0; i < fmcOut13.GetLength(0); i++)
@@ -1094,10 +1095,14 @@ namespace RoxCaseGen
                 fmcOut13[i, 3] = (int)(100 * fuelMoistures13[i, 3] / fuelMoistures13[i, 0]);
                 fmcOut13[i, 4] = 60;
                 fmcOut13[i, 5] = 90;
+                for (int j = 0; j < 4; j++)
+                {
+                    if (fmcOut13[i,j] <= 0){fmcOut13[i,j] = 4;}
+                }
             }
             //remmeber to alter the FMC creation function
             
-            this.fmc_A13 = fmcOut13;
+            this.FmcA13 = fmcOut13;
         }
         
         public static void CreateMultiBandGeoTiff(
@@ -1274,7 +1279,7 @@ namespace RoxCaseGen
             return commonXs.Max();
         }
 
-        public static void wuiPointsToShapefile(int[,] wuiIn, float cellsize, string[] header, int[] rasterDims, string sourcePRJ, string shpFilePath)
+        public static void WuiPointsToShapefile(int[,] wuiIn, float cellsize, string[] header, int[] rasterDims, string sourcePrj, string shpFilePath)
         {
             // 1. Register all GDAL/OGR drivers
             Gdal.AllRegister();   // This registers both raster (GDAL) and vector (OGR) drivers
@@ -1317,7 +1322,7 @@ namespace RoxCaseGen
 
             // 6. (Optional) Set a Spatial Reference. For example, EPSG:4326
             SpatialReference srs = new SpatialReference("");
-            string wktPrj = File.ReadAllText(sourcePRJ);
+            string wktPrj = File.ReadAllText(sourcePrj);
             SpatialReference sr = new SpatialReference("");
             sr.ImportFromWkt(ref wktPrj);
 
@@ -1423,11 +1428,11 @@ namespace RoxCaseGen
         }
         
     }
-    public class createShapefile
+    public class CreateShapefile
     {
-        public static void createAndWriteShapefile(double xCoord, double yCoord, string Path)               //create a shapefile for the ignition. Shamelessly stolen from the internet. Uses a NuGet package (NetTopologySuite) to work
+        public static void CreateAndWriteShapefile(double xCoord, double yCoord, string path_in)               //create a shapefile for the ignition. Shamelessly stolen from the internet. Uses a NuGet package (NetTopologySuite) to work
         {
-            string path = Path + "ROX";
+            string path = path_in + "ROX";
             string firstNameAttribute = "Type";
             string lastNameAttribute = "Location";
             var geomFactory = NtsGeometryServices.Instance.CreateGeometryFactory();

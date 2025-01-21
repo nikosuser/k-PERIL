@@ -17,7 +17,7 @@ namespace GeoTiffHelpers
     public class GeoTiffHelpers
     {
         //Driver code
-        public static void convertGeotiffToAsc(string geotiffFilePath, string outputPath)
+        public static void ConvertGeotiffToAsc(string geotiffFilePath, string outputPath)
         {
             // Register GDAL drivers
             // REQUIRED, DONT FORGET

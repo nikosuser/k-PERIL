@@ -40,13 +40,41 @@ namespace RoxCaseGen
     {
         static void Main(string[] args)
         {
+            //recalc_tbs();
             Main_source();
             //Main_demo();
+        }
+
+        static void recalc_tbs()
+        {
+            string path = Environment.GetEnvironmentVariable("RUNPATH");
+            var tbOutputNames = new List<string> { "ELMFIRE", "EPD", "Farsite", "LSTM", "WISE" };
+            int highestCommonX = ModelSetup.FindHighestCommonX(path + "/Outputs/", tbOutputNames);
+
+            foreach (string name in tbOutputNames)
+            {
+                string[] header = ModelSetup.GetHeader($"{path}/Outputs/SafetyMatrix_{name}.txt");
+                int[,] currentTb = ModelSetup.readASC_int($"{path}/Outputs/SafetyMatrix_{name}.txt");
+                int[,] tb = new int[currentTb.GetLength(0), currentTb.GetLength(1)];
+                for (int i = 1; i < highestCommonX+1; i++)
+                {
+                    int[,] readFile = ModelSetup.readASC_int($"{path}/Outputs/SafetyMatrix_{name}_{i}.txt");
+                    for (int j = 0; j < tb.GetLength(0); j++)
+                    {
+                        for (int k = 0; k < tb.GetLength(1); k++)
+                        {
+                            readFile[j, k] = readFile[j, k] < 0 ? 0 : readFile[j, k];
+                            tb[j,k]+=readFile[j,k];
+                        }
+                    }
+                }
+                ModelSetup.Output_ASC_File(header, tb,$"{path}/Outputs/SafetyMatrix_{name}.txt");
+            }
         }
         static void Main_source()
         {
             string path = Environment.GetEnvironmentVariable("RUNPATH");
-            string gdalDataPath ="C:\\Users\\nikos\\.nuget\\packages\\maxrev.gdal.core\\3.10.0.306\\runtimes\\any\\native\\gdal-data";
+            string gdalDataPath ="C:/Users/nikos/.nuget/packages/maxrev.gdal.core/3.10.0.306/runtimes/any/native/gdal-data";
             Environment.SetEnvironmentVariable ("GDAL_DATA", gdalDataPath);
             Gdal.SetConfigOption ("GDAL_DATA", gdalDataPath);
             string gdalSharePath = "C:/Users/nikos/.nuget/packages/gdal.native/3.10.0/build/gdal/share/";
@@ -63,9 +91,9 @@ namespace RoxCaseGen
             }
 
             const int conditioningDays = 30;
-            const int burnHours = 500;
-            const int cellsize = 30;
-            const bool ML_train = false;
+            const int burnHours = 1500;
+            const int cellsize = 200;
+            const bool mlTrain = false;
             const bool continueFromPrevious = false;
             
             string[] models = { "Farsite",
@@ -89,7 +117,7 @@ namespace RoxCaseGen
                 var tbOutputNames = new List<string> { "ELMFIRE", "EPD", "Farsite", "LSTM", "WISE" };
                 int highestCommonX = ModelSetup.FindHighestCommonX(path + "/Outputs/", tbOutputNames);
 
-                simNo = ML_train ? (int)(Directory.GetFiles($"{path}/ML/").Length/3)+1 : highestCommonX; 
+                simNo = mlTrain ? (int)(Directory.GetFiles($"{path}/ML/").Length/3)+1 : highestCommonX; 
                 
                 //reset convergence stuff
             }
@@ -106,60 +134,60 @@ namespace RoxCaseGen
                 }
                 File.Delete(path + "/log.txt");
                 Directory.CreateDirectory(path+ "/Log/");
-                ModelSetup.cleanupIters(path+"/FDS LS1/");
-                ModelSetup.cleanupIters(path+"/FDS LS4/");
-                simNo = ML_train ? (int)(Directory.GetFiles($"{path}/ML/").Length/3)+1 : 0;
+                ModelSetup.CleanupIters(path+"/FDS LS1/");
+                ModelSetup.CleanupIters(path+"/FDS LS4/");
+                simNo = mlTrain ? (int)(Directory.GetFiles($"{path}/ML/").Length/3)+1 : 0;
             }
 
-            ModelSetup.prepareNextIteration(path);
-            RunModels.checkInputsExist(path);
-            PERIL peril = new PERIL();
+            ModelSetup.PrepareNextIteration(path);
+            RunModels.CheckInputsExist(path);
+            Peril peril = new Peril();
             ModelSetup please = new ModelSetup();
             
-            float[,] fileInput = please.parseInputFilesToMemory(path + "Input/VARS.txt");
+            float[,] fileInput = please.ParseInputFilesToMemory(path + "Input/VARS.txt");
             
-            int[,] WUI_in = new int[(int)fileInput[14, 0], 2];              //pase in the WUI polygon corners
+            int[,] wuiIn = new int[(int)fileInput[14, 0], 2];              //pase in the WUI polygon corners
             for (int i = 0; i < fileInput[14, 0]; i++)
             {
-                WUI_in[i, 0] = (int)fileInput[15 + 2 * i, 0];
-                WUI_in[i, 1] = (int)fileInput[15 + 2 * i + 1, 0];
+                wuiIn[i, 0] = (int)fileInput[15 + 2 * i, 0];
+                wuiIn[i, 1] = (int)fileInput[15 + 2 * i + 1, 0];
             }
             
-            List<PointF> WUI_f = new List<PointF>();
-            for (int i = 0; i < WUI_in.GetLength(0); i++)
+            List<PointF> wuiF = new List<PointF>();
+            for (int i = 0; i < wuiIn.GetLength(0); i++)
             {
-                WUI_f.Add(new PointF(WUI_in[i, 0], WUI_in[i, 1]));
+                wuiF.Add(new PointF(wuiIn[i, 0], wuiIn[i, 1]));
             }  
-            please.WUI = WUI_f;
-            please.fuelMap = ModelSetup.readASC_int(path + "Input/Farsite/Input/fuel.asc");
-            int[,] WUI = PERIL.getPolygonEdgeNodes(WUI_in);                 //get all the useful WUI polygon nodes based on the given corners. 
-            string[] header = ModelSetup.getHeader(path + "Input/Farsite/Input/fuel.asc");
-            ModelSetup.wuiPointsToShapefile(WUI_in, cellsize, header, [please.fuelMap.GetLength(0),please.fuelMap.GetLength(1)],path + "Input/Farsite/Input/fuel.prj",path + "/WUI.shp");
+            please.Wui = wuiF;
+            please.FuelMap = ModelSetup.readASC_int(path + "Input/Farsite/Input/fuel.asc");
+            int[,] wui = Peril.GetPolygonEdgeNodes(wuiIn);                 //get all the useful WUI polygon nodes based on the given corners. 
+            string[] header = ModelSetup.GetHeader(path + "Input/Farsite/Input/fuel.asc");
+            ModelSetup.WuiPointsToShapefile(wuiIn, cellsize, header, [please.FuelMap.GetLength(0),please.FuelMap.GetLength(1)],path + "Input/Farsite/Input/fuel.prj",path + "/WUI.shp");
             
-            ModelSetup.Output_ASC_File(header,WUI, path + "/WUIboundary.txt");       //save the used urban nodes in file for debugging/visualisation/further inspection.
+            ModelSetup.Output_ASC_File(header,wui, path + "/WUIboundary.txt");       //save the used urban nodes in file for debugging/visualisation/further inspection.
             
-            please.setValues(path);
-            please.burnHours = burnHours;
-            please.conditioningDays = conditioningDays;
-            please.cellsize = cellsize;
-            please.fuelMoisture = [6, 7, 8, 60, 90];
-            please.rawStartTime = new DateTime(2025, 1, 1, 0, 0, 0);
+            please.SetValues(path);
+            please.BurnHours = burnHours;
+            please.ConditioningDays = conditioningDays;
+            please.Cellsize = cellsize;
+            please.FuelMoisture = [6, 7, 8, 60, 90];
+            please.RawStartTime = new DateTime(2025, 1, 1, 0, 0, 0);
             bool[] modelsDone = new bool[models.Length];
             int[,,] allSafetyBoundaries =
-                new int[models.GetLength(0), please.fuelMap.GetLength(0), please.fuelMap.GetLength(1)];
+                new int[models.GetLength(0), please.FuelMap.GetLength(0), please.FuelMap.GetLength(1)];
             int[] consecutiveConvergence = new int[models.GetLength(0)];
             float currentError=1;
 
             while (!modelsDone.All(x => x))
             {
-                if (ML_train)
+                if (mlTrain)
                 {
-                    RunModels.checkInputsExist(path);
+                    RunModels.CheckInputsExist(path);
                     Console.WriteLine($"Sim no: {simNo}, current convergence: ");
                     int[] ignitionCoords = please.InitialiseIterationAndGetIgnition(path);
-                    please.conditioningDays = 1 + burnHours / 24;
-                    RunModels.setupFarsiteIteration(path + "Farsite/Input/", ignitionCoords, please);
-                    RunModels.convertToSpecificModel("Farsite", path, please);
+                    please.ConditioningDays = 1 + burnHours / 24;
+                    RunModels.SetupFarsiteIteration(path + "Farsite/Input/", ignitionCoords, please);
+                    RunModels.ConvertToSpecificModel("Farsite", path, please);
                     RunModels.RunModel(models[0], path, please, simNo);
                     Thread.Sleep(500);
                     if (File.Exists($"{path}/Farsite/Median_Outputs/_ArrivalTime.asc"))
@@ -176,7 +204,7 @@ namespace RoxCaseGen
                 }
                 else
                 {
-                    RunModels.checkInputsExist(path);
+                    RunModels.CheckInputsExist(path);
                     simNo++;
                     Console.WriteLine($"Sim no: {simNo}, current convergence: ");
                     for (int i = 0; i < models.Length; i++)
@@ -185,25 +213,25 @@ namespace RoxCaseGen
                     }
 
                     int[] ignitionCoords = please.InitialiseIterationAndGetIgnition(path);
-                    please.GetFMC(path);
-                    RunModels.setupFarsiteIteration(path + "Farsite/Input/", ignitionCoords, please);
+                    please.GetFmc(path);
+                    RunModels.SetupFarsiteIteration(path + "Farsite/Input/", ignitionCoords, please);
 
                     string failFlag = "";
-                    for (int i = 1; i < models.GetLength(0); i++)
+                    for (int i = 0; i < models.GetLength(0); i++)
                     {
-                        RunModels.convertToSpecificModel(models[i], path, please);
+                        RunModels.ConvertToSpecificModel(models[i], path, please);
                         try
                         {
                             RunModels.RunModel(models[i], path, please, simNo);
-                            float[,] ros = RunModels.retrieveResult(models[i], path, "ROS", please);
-                            float[,] azimuth = RunModels.retrieveResult(models[i], path, "Azimuth", please);
+                            float[,] ros = RunModels.RetrieveResult(models[i], path, "ROS", please);
+                            float[,] azimuth = RunModels.RetrieveResult(models[i], path, "Azimuth", please);
                             //ros = ModelSetup.TransposeMatrix(ros);
                             //azimuth = ModelSetup.TransposeMatrix(azimuth);
                             ModelSetup.Output_ASC_File(header, ros, $"{path}/Log/{models[i]}_ROS_{simNo}.asc");
                             ModelSetup.Output_ASC_File(header, azimuth, $"{path}/Log/{models[i]}_AZ_{simNo}.asc");
 
-                            int[,] temp = peril.calcSingularBoundary(please.cellsize, (int)please.actualASET,
-                                please.windMag, WUI, ros,
+                            int[,] temp = peril.CalcSingularBoundary(please.Cellsize, (int)please.ActualAset,
+                                please.WindMag, wui, ros,
                                 azimuth); //Call k-PERIL to find the boundary of this simulation
                             temp = ModelSetup.TransposeMatrix(temp);
                             for (int j = 0; j < temp.GetLength(0); j++)
@@ -247,10 +275,10 @@ namespace RoxCaseGen
                         //modelsDone[modelsDone.Length-1] = true;
                         //modelsDone[modelsDone.Length-2] = true;
                     }
-                    RunModels.logArrivalTimes(path, simNo);
+                    RunModels.LogArrivalTimes(path, simNo);
                     Console.WriteLine($"Iteration finished: {simNo}");
                     //Console.ReadLine();
-                    ModelSetup.prepareNextIteration(path);
+                    ModelSetup.PrepareNextIteration(path);
                 }
             }
 
@@ -280,32 +308,32 @@ namespace RoxCaseGen
             }
             Directory.CreateDirectory(strWorkPath+ "/Output");
             
-            float[,] fileInput = please.parseInputFilesToMemory(strWorkPath + "/Input/variables.txt");
-            string[] header = ModelSetup.getHeader(strWorkPath + "/Input/fuel.asc");
-            please.fuelMap = ModelSetup.readASC_int(strWorkPath + "/Input/fuel.asc");
+            float[,] fileInput = please.ParseInputFilesToMemory(strWorkPath + "/Input/variables.txt");
+            string[] header = ModelSetup.GetHeader(strWorkPath + "/Input/fuel.asc");
+            please.FuelMap = ModelSetup.readASC_int(strWorkPath + "/Input/fuel.asc");
 
-            int[,] WUI_in = new int[(int)fileInput[15, 0], 2];              //pase in the WUI polygon corners
+            int[,] wuiIn = new int[(int)fileInput[15, 0], 2];              //pase in the WUI polygon corners
             for (int i = 0; i < fileInput[15, 0]; i++)
             {
-                WUI_in[i, 0] = (int)fileInput[16 + 2 * i, 0];
-                WUI_in[i, 1] = (int)fileInput[16 + 2 * i + 1, 0];
+                wuiIn[i, 0] = (int)fileInput[16 + 2 * i, 0];
+                wuiIn[i, 1] = (int)fileInput[16 + 2 * i + 1, 0];
             }
-            ModelSetup.wuiPointsToShapefile(WUI_in, 30, header, [please.fuelMap.GetLength(0),please.fuelMap.GetLength(1)],strWorkPath + "/Input/fuel.prj",strWorkPath + "/Output/WUI.shp");
-            int[,] WUI = PERIL.getPolygonEdgeNodes(WUI_in);
+            ModelSetup.WuiPointsToShapefile(wuiIn, 30, header, [please.FuelMap.GetLength(0),please.FuelMap.GetLength(1)],strWorkPath + "/Input/fuel.prj",strWorkPath + "/Output/WUI.shp");
+            int[,] wui = Peril.GetPolygonEdgeNodes(wuiIn);
             
-            PERIL peril = new PERIL();
+            Peril peril = new Peril();
             
             var fileCount = (from file in Directory.EnumerateFiles(strWorkPath + "/SimResults/", "*.asc", SearchOption.AllDirectories)
                 select file).Count();
-            int[,] probTB =
-                new int[please.fuelMap.GetLength(0), please.fuelMap.GetLength(1)];
+            int[,] probTb =
+                new int[please.FuelMap.GetLength(0), please.FuelMap.GetLength(1)];
             int consecutiveConvergence = 0;
             for (int i = 0; i < fileCount/2; i++)
             {
                 var ros = ModelSetup.readASC_float(strWorkPath + "/SimResults/ELMFIRE_ROS_" + i + ".asc");
                 var az = ModelSetup.readASC_float(strWorkPath + "/SimResults/ELMFIRE_AZ_" + i + ".asc");
-                int[,] temp = peril.calcSingularBoundary(30, (int)80,
-                    15, WUI, ros,az); 
+                int[,] temp = peril.CalcSingularBoundary(30, (int)80,
+                    15, wui, ros,az); 
                 temp = ModelSetup.TransposeMatrix(temp);
                 ModelSetup.Output_ASC_File(header, temp,
                     strWorkPath + $"/Output/TriggerBoundary_{i+1}.asc");
@@ -321,10 +349,10 @@ namespace RoxCaseGen
                 {
                     for (int k = 0; k < temp.GetLength(1); k++)
                     {
-                        probTB[j, k] += temp[j, k];
+                        probTb[j, k] += temp[j, k];
                     }
                 }
-                ModelSetup.Output_ASC_File(header, probTB,
+                ModelSetup.Output_ASC_File(header, probTb,
                     strWorkPath + $"/Output/ProbabilisticTriggerBoundary.asc");
 
                 Console.WriteLine($"===========================================");
