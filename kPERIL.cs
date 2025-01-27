@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace k_PERIL_DLL
+namespace kPERIL_DLL
 {
-    internal class PerilData       //peril setup methods
+    internal class PERILData       
     {
         private float[,] _azimuth;                 //Rate of spread magnitude
         private float[,] _ros;                   //Rate of Spread magnitude (coupled with azimuth)
@@ -18,7 +18,9 @@ namespace k_PERIL_DLL
         private int[,] _rosloc;                  //tracks the cardinal neighbors of each linearised cell.
         private float[,] _graph;                 //variable to store the weight values for the target node
 
-        public float[] DebugMatrix;             //debug purposes
+        private bool _haveData = false;
+
+        public float[] _debugMatrix;             //debug purposes
 
         readonly static float sqrt2 = (float)Math.Sqrt(2.0);
 
@@ -30,31 +32,38 @@ namespace k_PERIL_DLL
             _ros = ros;
             _azimuth = azimuth;
             _totalX = totalX;
-            _totalY = totalY;            
+            _totalY = totalY;    
+            
+            _haveData = true;
         }
 
         public int[,] CalculateTriggerBuffer(int[] wuInput)
         {
-            //calculate Cardinal Direction ROS
-            CalculateRosTheta();
-            //Console.WriteLine("ROS_THETA GENERATED");                                       
+            if (_haveData)
+            {
+                //calculate Cardinal Direction ROS
+                CalculateRosTheta();
+                //Console.WriteLine("ROS_THETA GENERATED");                                       
 
-            //Calculate ROSn
-            SetRosN();
-            //Console.WriteLine("ROSn GENERATED");                                           
+                //Calculate ROSn
+                SetRosN();
+                //Console.WriteLine("ROSn GENERATED");                                           
 
-            //Calculate Rosloc
-            SetRosLoc();
-            //Console.WriteLine("ROSLOC GENERATED");                                                                                                                      
+                //Calculate Rosloc
+                SetRosLoc();
+                //Console.WriteLine("ROSLOC GENERATED");                                                                                                                      
 
-            //Calculate Weights Matrix
-            SetWeight();
-            //Console.WriteLine("WEIGHTS GENERATED");
+                //Calculate Weights Matrix
+                SetWeight();
+                //Console.WriteLine("WEIGHTS GENERATED");
 
-            int[,] safetyMatrix = GetSafetyMatrix(wuInput);
-            Console.WriteLine("BOUNDARY GENERATED");
+                int[,] safetyMatrix = GetSafetyMatrix(wuInput);
+                Console.WriteLine("BOUNDARY GENERATED");
 
-            return safetyMatrix;
+                return safetyMatrix;
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -452,7 +461,7 @@ namespace k_PERIL_DLL
                     //parse the array elements to the big output matrix
                     allDistances[j, i] = temp[j];                                           
                 }
-                this.DebugMatrix = temp;
+                _debugMatrix = temp;
             }            
 
             int[,] safetyMatrix = new int[_totalX,_totalY];
@@ -464,9 +473,16 @@ namespace k_PERIL_DLL
             {
                 safetyMatrix[currentDangerZone[i] / _totalY, (currentDangerZone[i] % _totalY)]++;
             }
+
             Console.WriteLine();
             return safetyMatrix;
         }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="wui"></param>
+        /// <returns></returns>
         public int[] CheckOutOfBounds(int[,] wui)
         {
             //create the WUI variable (a new one to parse any kind of edit to it)
@@ -489,11 +505,12 @@ namespace k_PERIL_DLL
             return wuInput;
         }
     }
-    public class kPeril           //the actual program
+
+    public class kPERIL           //the actual program
     {
         private List<int[,]> _allBoundaries = new List<int[,]>();
-        int[] _rasterSize = new int[2];
-        PerilData data = new PerilData();
+        private int[] _rasterSize = new int[2];
+        private PERILData _data = new PERILData();
 
         /// <summary>
         /// This method represents one iteration.
@@ -513,10 +530,10 @@ namespace k_PERIL_DLL
             _rasterSize[0] = xDim;
             _rasterSize[1] = yDim;
 
-            data.SetData(cellSize, triggerBuffer, midFlameWindspeed, ros, azimuth, xDim, yDim);
+            _data.SetData(cellSize, triggerBuffer, midFlameWindspeed, ros, azimuth, xDim, yDim);
 
             //Linearise the WUIarea array, get its boundary, and delinearise
-            int[,] wui = data.Delinearise(data.CompoundBoundary(data.Linearise(wuiArea)));     
+            int[,] wui = _data.Delinearise(_data.CompoundBoundary(_data.Linearise(wuiArea)));     
             /*
             Console.Write("WUI Boundary Nodes: ");//Output the WUI area boundary generated in the Console
             for (int i = 0; i < WUI.GetLength(0); i++)
@@ -526,7 +543,7 @@ namespace k_PERIL_DLL
             Console.WriteLine();
             */
 
-            int[] wuInput = data.CheckOutOfBounds(wui);
+            int[] wuInput = _data.CheckOutOfBounds(wui);
 
             bool noFire = false;
 
@@ -541,7 +558,7 @@ namespace k_PERIL_DLL
             
             if (!noFire)
             {
-                int[,] safetyMatrix = data.CalculateTriggerBuffer(wuInput); 
+                int[,] safetyMatrix = _data.CalculateTriggerBuffer(wuInput); 
                 return safetyMatrix;
             }
 
@@ -562,7 +579,8 @@ namespace k_PERIL_DLL
         {
             for (int i=0; i<cellSize.Length; i++)
             {
-                _allBoundaries.Append(CalculateBoundary(cellSize[i], tBuffer[i], midFlameWindspeed[i], wuIarea[i], ros[i], azimuth[i]));
+                int[,] boundary = CalculateBoundary(cellSize[i], tBuffer[i], midFlameWindspeed[i], wuIarea[i], ros[i], azimuth[i]);
+                _allBoundaries.Add(boundary);
             }
         }
 
@@ -572,6 +590,11 @@ namespace k_PERIL_DLL
         /// <returns>An X by Y array representing the domain</returns>
         public int[,] GetProbBoundary()
         {
+            if(_allBoundaries == null)
+            {
+                return null;
+            }
+
             int[,] output = new int[_rasterSize[0], _rasterSize[1]];
             foreach (int[,] boundary in _allBoundaries)
             {
