@@ -1,1 +1,0 @@
-C:\Users\nikos\source\repos\RoxCaseGen\FLAMMAP\TestFlamMap.exe C:\Users\nikos\source\repos\RoxCaseGen\ROX.txt
