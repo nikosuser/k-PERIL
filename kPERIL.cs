@@ -7,8 +7,14 @@ namespace kPERIL_DLL
     public class kPERIL
     {
         private List<int[,]> _allBoundaries;
-        private int[] _rasterSize = new int[2];
-        private PERILData _data = new PERILData();
+        private int[] _rasterSize;
+        private PERILData _data;
+
+        public kPERIL() 
+        {
+            _rasterSize = new int[2];
+            _data = new PERILData(this);
+        }
 
         /// <summary>
         /// This method represents one iteration.
@@ -19,9 +25,17 @@ namespace kPERIL_DLL
         /// <param name="wuiArea">An X by 2 array listing points defining a polygon. This polygon is used as the urban area around which the boundary is calculated.The dimensions of each point are about the domain with (0,0) being the top left corner. </param>
         /// <param name="ros">The rate of spread magniture array of size X by Y, in meters per minute</param>
         /// <param name="azimuth">The rate of spread direction array of size X by Y, in degrees from north, clockwise</param>
+        /// <param name="consoleOutput">Optional, used to capture any consaole messages from k-PERIL.</param>
         /// <returns>An X by Y array representing the landscape. Points are 1 if inside the boundary and 0 if outside.</returns>
-        public int[,] CalculateBoundary(float cellSize, int triggerBuffer, float midFlameWindspeed, int[,] wuiArea, float[,] ros, float[,] azimuth)
-        {    
+        public int[,] CalculateBoundary(float cellSize, int triggerBuffer, float midFlameWindspeed, int[,] wuiArea, float[,] ros, float[,] azimuth, System.IO.StringWriter consoleOutput = null)
+        {
+            //if we call from a non console program we need to be able to access the log/error messages
+            if(consoleOutput != null)
+            {
+                Console.SetOut(consoleOutput);
+                Console.SetError(consoleOutput);
+            }
+
             int yDim = azimuth.GetLength(0);
             int xDim = azimuth.GetLength(1);
 
@@ -53,14 +67,23 @@ namespace kPERIL_DLL
                     noFire = true;
                 }
             }
-            
+
+            int[,] safetyMatrix = null;
             if (!noFire)
             {
-                int[,] safetyMatrix = _data.CalculateTriggerBuffer(wuInput); 
-                return safetyMatrix;
+                safetyMatrix = _data.CalculateTriggerBuffer(wuInput);                 
             }
 
-            return null;
+            if(consoleOutput != null)
+            {
+                // Recover the standard output stream
+                System.IO.StreamWriter standardOutput = new System.IO.StreamWriter(Console.OpenStandardOutput());
+                standardOutput.AutoFlush = true;
+                Console.SetOut(standardOutput);
+                Console.SetError(standardOutput);
+            }            
+
+            return safetyMatrix;           
         }
 
         /// <summary>
@@ -189,7 +212,7 @@ namespace kPERIL_DLL
         /// </summary>
         /// <param name="endNodes"> Array of X by 2 representing the coordinates of the polygon nodes</param>
         /// <returns>Array of Y by 2 of all the points in the perimeter of the polygon</returns>
-        public static int[,] GetPolygonEdgeNodes(int[,] endNodes)
+        public int[,] GetPolygonEdgeNodes(int[,] endNodes)
         {
             int noNodes = endNodes.GetLength(0);
 
@@ -218,7 +241,7 @@ namespace kPERIL_DLL
             return Get2DarrayFromIntList(allNodes);
         }
 
-        public static int[,] GetAllNodesBetween(int[,] endNodes)
+        private int[,] GetAllNodesBetween(int[,] endNodes)
         {
             double x1 = endNodes[0, 0];
             double y1 = endNodes[0, 1];
@@ -311,7 +334,7 @@ namespace kPERIL_DLL
             return Get2DarrayFromIntList(allNodes);
         }
 
-        public static int[,] Get2DarrayFromIntList(List<int[]> list)
+        private int[,] Get2DarrayFromIntList(List<int[]> list)
         {
             int[][] jaggedArray = list.Distinct().ToArray();
             int[,] output = new int[jaggedArray.GetLength(0), 2];

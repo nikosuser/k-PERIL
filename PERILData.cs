@@ -18,10 +18,16 @@ namespace kPERIL_DLL
         private int[,] _rosloc;                  //tracks the cardinal neighbors of each linearised cell.
         private float[,] _graph;                 //variable to store the weight values for the target node
         private bool _haveData = false;
+        private kPERIL _perilOwner;
 
         public float[] DebugMatrix;             //debug purposes
 
         readonly static float sqrt2 = (float)Math.Sqrt(2.0);
+
+        public PERILData(kPERIL perilOwner)
+        {
+            _perilOwner = perilOwner;
+        }
 
         public void SetData(float cell, int triggerBuffer, float u, float[,] ros, float[,] azimuth, int totalX, int totalY)
         {
@@ -235,7 +241,7 @@ namespace kPERIL_DLL
                 for (int j = 0; j < weightList.GetLength(0); j++)
                 {
                     //if the weight of the node is less than Tbuffer
-                    if (weightList[j, i] <= this._triggerBuffer && weightList[j, i] > 0)
+                    if (weightList[j, i] <= _triggerBuffer && weightList[j, i] > 0)
                     {
                         //include it in the boundary list
                         boundary.Add(j);
@@ -335,18 +341,26 @@ namespace kPERIL_DLL
         /// <exception cref="Exception"></exception>
         private void CheckGeneralOutOfBounds(int wuIx, int wuIy)
         {
-            if (wuIx > _totalX || wuIy > _totalY || wuIx < 0 || wuIy < 0)    //if the point is either outside the max raster size or negative
+            //if the point is either outside the max raster size or negative
+            if (wuIx > _totalX || wuIy > _totalY || wuIx < 0 || wuIy < 0)    
             {
-                Console.WriteLine("MAX X: " + _totalX + " MAX Y: " + _totalY);    //show a console error
-                throw new Exception("ERROR: ONE OR MORE COORDINATES OUT OF BOUNDS");                        //throw new exception
+                //show a console error
+                Console.WriteLine("MAX X: " + _totalX + " MAX Y: " + _totalY);
+                //throw new exception
+                throw new Exception("ERROR: ONE OR MORE COORDINATES OUT OF BOUNDS");                        
             }
         }
-        public int[] Linearise(int[,] wui)          //Method to turn the 2D Matrix points to their 1D linearised form
+
+        //Method to turn the 2D Matrix points to their 1D linearised form
+        public int[] Linearise(int[,] wui)          
         {
-            int[] output = new int[wui.GetLength(0)];       //create new output variable
-            for (int i = 0; i < wui.GetLength(0); i++)      //for all the points in the input variable
+            //create new output variable
+            int[] output = new int[wui.GetLength(0)];
+            //for all the points in the input variable
+            for (int i = 0; i < wui.GetLength(0); i++)      
             {
-                output[i] = wui[i, 0] * _totalY + wui[i, 1];     //convert the output from a 2D raster to the 1D network
+                //convert the output from a 2D raster to the 1D network
+                output[i] = wui[i, 0] * _totalY + wui[i, 1];    
             }
             return output;
         }
@@ -354,10 +368,13 @@ namespace kPERIL_DLL
         //Method to turn the raster from a 1D linear naming form to a 2D matrix form
         public int[,] Delinearise(int[] wui)
         {
-            int[,] output = new int[wui.Length, 2];         //create new output variable
-            for (int i = 0; i < wui.Length; i++)            //for all the elements in the input variable
+            //create new output variable
+            int[,] output = new int[wui.Length, 2];
+            //for all the elements in the input variable
+            for (int i = 0; i < wui.Length; i++)            
             {
-                output[i, 0] = (int)wui[i] / _totalY;            //convert the output from a linearised network back to the 2D raster
+                //convert the output from a linearised network back to the 2D raster
+                output[i, 0] = (int)wui[i] / _totalY;            
                 output[i, 1] = wui[i] % _totalY;
             }
             return output;

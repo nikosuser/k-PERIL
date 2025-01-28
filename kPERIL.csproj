@@ -1,44 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk;Microsoft.NET.Sdk.Publish">
   <PropertyGroup>
     <OutputType>Library</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
-    <Platforms>AnyCPU;x86;ARM32</Platforms>
+    <TargetFramework>net481</TargetFramework>
+    <Platforms>AnyCPU;x86</Platforms>
     <DockerDefaultTargetOS>Windows</DockerDefaultTargetOS>
     <DockerfileContext>.</DockerfileContext>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
   </PropertyGroup>
-  <ItemGroup>
-    <Compile Remove="matiOutputs\**" />
-    <EmbeddedResource Remove="matiOutputs\**" />
-    <None Remove="matiOutputs\**" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Remove="ROX.shp_SPREADRATE.asc" />
-    <None Remove="ROX.shp_SPREADRATE.prj" />
-    <None Remove="ROX.shp_SPREADRATE.tif" />
-    <None Remove="ROX.shp_SPREADRATE.tif.aux.xml" />
-    <None Remove="ROX.shp_WINDDIRGRID.asc" />
-    <None Remove="ROX.shp_WINDDIRGRID.prj" />
-    <None Remove="ROX.shp_WINDDIRGRID.tif" />
-    <None Remove="ROX.shp_WINDDIRGRID.tif.aux.xml" />
-    <None Remove="ROX.shp_WINDSPEEDGRID.asc" />
-    <None Remove="ROX.shp_WINDSPEEDGRID.prj" />
-    <None Remove="ROX.shp_WINDSPEEDGRID.tif" />
-    <None Remove="ROX.shp_WINDSPEEDGRID.tif.aux.xml" />
-    <None Remove="ROX.shp_WindVectors.kml" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="BitMiracle.LibTiff.NET" Version="2.4.649" />
-    <PackageReference Include="DotSpatial.Data" Version="3.0.1" />
-    <PackageReference Include="GeoAPI" Version="1.7.5" />
-    <PackageReference Include="MaxRev.Gdal.Core" Version="3.10.0.306" />
-    <PackageReference Include="MaxRev.Gdal.WindowsRuntime.Minimal" Version="3.10.0.306" />
-    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.17.0" />
-    <PackageReference Include="NetTopologySuite" Version="2.5.0" />
-    <PackageReference Include="NetTopologySuite.CoordinateSystems" Version="1.15.3" />
-    <PackageReference Include="NetTopologySuite.IO.Esri.Shapefile" Version="1.2.0" />
-    <PackageReference Include="NetTopologySuite.IO.ShapeFile" Version="2.0.0" />
-    <PackageReference Include="ProjNET" Version="2.0.0" />
-  </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
@@ -46,21 +14,4 @@
   <Target Name="AfterBuild">
   </Target>
   -->
-  <ItemGroup>
-    <Reference Include="EGIS.Controls">
-      <HintPath>easygisdotnet\EGIS.Controls.dll</HintPath>
-    </Reference>
-    <Reference Include="EGIS.Projections">
-      <HintPath>easygisdotnet\EGIS.Projections.dll</HintPath>
-    </Reference>
-    <Reference Include="EGIS.ShapeFileLib">
-      <HintPath>easygisdotnet\EGIS.ShapeFileLib.dll</HintPath>
-    </Reference>
-    <Reference Include="kPERIL_ClassLib">
-      <HintPath>..\kPERIL_ClassLib\bin\Debug\netcoreapp3.1\kPERIL_ClassLib.dll</HintPath>
-    </Reference>
-    <Reference Include="MapTools">
-      <HintPath>bin\MapTools.dll</HintPath>
-    </Reference>
-  </ItemGroup>
 </Project>
