@@ -20,15 +20,17 @@ namespace kPERIL_DLL
         /// This method represents one iteration.
         /// </summary>
         /// <param name="cellSize">The square size of each raster (most commonly 30m)</param>
-        /// <param name="triggerBuffer">Trigger buffer time in minutes</param>
+        /// <param name="RSET">RSET time in minutes</param>
+        /// <param name="bufferTime"> Any additional buffer time desired on top of RSET</param>
         /// <param name="midFlameWindspeed">The wind speed in the midflame height, representing the entire domain (spatially and temporally)</param>
         /// <param name="wuiArea">An X by 2 array listing points defining a polygon. This polygon is used as the urban area around which the boundary is calculated.The dimensions of each point are about the domain with (0,0) being the top left corner. </param>
         /// <param name="ros">The rate of spread magniture array of size X by Y, in meters per minute</param>
         /// <param name="azimuth">The rate of spread direction array of size X by Y, in degrees from north, clockwise</param>
-        /// <param name="consoleOutput">Optional, used to capture any consaole messages from k-PERIL.</param>
+        /// <param name="consoleOutput">Optional, used to capture any console messages from k-PERIL.</param>
         /// <returns>An X by Y array representing the landscape. Points are 1 if inside the boundary and 0 if outside.</returns>
-        public int[,] CalculateBoundary(float cellSize, int triggerBuffer, float midFlameWindspeed, int[,] wuiArea, float[,] ros, float[,] azimuth, System.IO.StringWriter consoleOutput = null)
+        public int[,] CalculateBoundary(float cellSize, float RSET, float bufferTime, float midFlameWindspeed, int[,] wuiArea, float[,] ros, float[,] azimuth, System.IO.StringWriter consoleOutput = null)
         {
+            RSET += bufferTime;
             //if we call from a non console program we need to be able to access the log/error messages
             if(consoleOutput != null)
             {
@@ -42,7 +44,7 @@ namespace kPERIL_DLL
             _rasterSize[0] = xDim;
             _rasterSize[1] = yDim;
 
-            _data.SetData(cellSize, triggerBuffer, midFlameWindspeed, ros, azimuth, xDim, yDim);
+            _data.SetData(cellSize, RSET, midFlameWindspeed, ros, azimuth, xDim, yDim);
 
             //Linearise the WUIarea array, get its boundary, and delinearise
             int[,] wui = _data.Delinearise(_data.CompoundBoundary(_data.Linearise(wuiArea)));     
@@ -90,19 +92,20 @@ namespace kPERIL_DLL
         /// The main callable method of k-PERIL.This method calculates multiple iterations and saves them within the object.
         /// </summary>
         /// <param name="cellSize"> An array of The square size of each point (most commonly 30m) for each simulation</param>
-        /// <param name="tBuffer"> An array ofThe prescribed evacuation time, in minutes</param>
+        /// <param name="RSET"> An array ofThe prescribed evacuation time, in minutes</param>
+        /// <param name="bufferTime"> Any additional buffer time desired on top of RSET</param>
         /// <param name="midFlameWindspeed">An array of The wind speed in the midflame height, representing the entire domain (spatially and temporally)</param>
         /// <param name="wuIarea">A jagged array of X by 2 array listing points defining a polygon. This polygon is used as the urban area around which the boundary is calculated.The dimensions of each point are about the domain with (0,0) being the top left corner. </param>
         /// <param name="ros">A jagged array of The rate of spread magniture array of size X by Y, in meters per minute</param>
         /// <param name="azimuth">A jagged array of The rate of spread direction array of size X by Y, in degrees from north, clockwise</param>
         /// <returns>An X by Y array representing the landscape. Points are 1 if inside the boundary and 0 if outside.</returns>
-        public List<int[,]> CalculateMultipleBoundaries(float[] cellSize, int[] tBuffer, float[] midFlameWindspeed, int[][,] wuIarea, float[][,] ros, float[][,] azimuth)
+        public List<int[,]> CalculateMultipleBoundaries(float[] cellSize, float[] RSET, float bufferTime, float[] midFlameWindspeed, int[][,] wuIarea, float[][,] ros, float[][,] azimuth)
         {
             _allBoundaries = new List<int[,]>();
 
             for (int i=0; i<cellSize.Length; i++)
             {
-                int[,] boundary = CalculateBoundary(cellSize[i], tBuffer[i], midFlameWindspeed[i], wuIarea[i], ros[i], azimuth[i]);
+                int[,] boundary = CalculateBoundary(cellSize[i], RSET[i], bufferTime, midFlameWindspeed[i], wuIarea[i], ros[i], azimuth[i]);
                 _allBoundaries.Add(boundary);
             }
 

@@ -14,7 +14,7 @@ namespace kPERIL_DLL
         private int _totalX;                     //Total raster size in X
         private int[] _rosN;                     //linearised array of all the non-boundary nodes
         private float _cell;                       //cell size (m)
-        private int _triggerBuffer;                    //trigger buffer time in minutes
+        private float _triggerBuffer;                    //trigger buffer time in minutes
         private int[,] _rosloc;                  //tracks the cardinal neighbors of each linearised cell.
         private float[,] _graph;                 //variable to store the weight values for the target node
         private bool _haveData = false;
@@ -29,10 +29,10 @@ namespace kPERIL_DLL
             _perilOwner = perilOwner;
         }
 
-        public void SetData(float cell, int triggerBuffer, float u, float[,] ros, float[,] azimuth, int totalX, int totalY)
+        public void SetData(float cell, float RSET, float u, float[,] ros, float[,] azimuth, int totalX, int totalY)
         {
             _cell = cell;
-            _triggerBuffer = triggerBuffer;
+            _triggerBuffer = RSET;
             _u = u;
             _ros = ros;
             _azimuth = azimuth;
@@ -74,7 +74,7 @@ namespace kPERIL_DLL
         /// <summary>
         /// Calculate ROS, includes rate of spread to all 8 cardinal directions
         /// </summary>
-        public void CalculateRosTheta()
+        private void CalculateRosTheta()
         {
             double lb = 0.936 * Math.Exp(0.2566 * _u) + 0.461 * Math.Exp(-0.1548 * _u) - 0.397; //Calculate length to Breadth ratio of Huygens ellipse
             double hb = (lb + (float)Math.Sqrt(lb * lb - 1)) / (lb - (float)Math.Sqrt(lb * lb - 1));    //calculate head to back ratio
@@ -442,6 +442,11 @@ namespace kPERIL_DLL
             return distance;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="node"></param>
+        /// <returns></returns>
         private bool IsOnBoundary(int node)
         {
             int[] input = { node };
@@ -459,6 +464,11 @@ namespace kPERIL_DLL
             return false;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="wuInput"></param>
+        /// <returns></returns>
         private int[,] GetSafetyMatrix(int[] wuInput)
         {
             //create distance matrix
