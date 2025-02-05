@@ -28,9 +28,8 @@ namespace kPERIL_DLL
         /// <param name="azimuth">The rate of spread direction array of size X by Y, in degrees from north, clockwise</param>
         /// <param name="consoleOutput">Optional, used to capture any console messages from k-PERIL.</param>
         /// <returns>An X by Y array representing the landscape. Points are 1 if inside the boundary and 0 if outside.</returns>
-        public int[,] CalculateBoundary(float cellSize, float RSET, float bufferTime, float midFlameWindspeed, int[,] wuiArea, float[,] ros, float[,] azimuth, System.IO.StringWriter consoleOutput = null)
+        public int[,] CalculateBoundary(float cellSize, float RSET, float midFlameWindspeed, int[,] wuiArea, float[,] ros, float[,] azimuth, System.IO.StringWriter consoleOutput = null)
         {
-            RSET += bufferTime;
             //if we call from a non console program we need to be able to access the log/error messages
             if(consoleOutput != null)
             {
@@ -99,13 +98,13 @@ namespace kPERIL_DLL
         /// <param name="ros">A jagged array of The rate of spread magniture array of size X by Y, in meters per minute</param>
         /// <param name="azimuth">A jagged array of The rate of spread direction array of size X by Y, in degrees from north, clockwise</param>
         /// <returns>An X by Y array representing the landscape. Points are 1 if inside the boundary and 0 if outside.</returns>
-        public List<int[,]> CalculateMultipleBoundaries(float[] cellSize, float[] RSET, float bufferTime, float[] midFlameWindspeed, int[][,] wuIarea, float[][,] ros, float[][,] azimuth)
+        public List<int[,]> CalculateMultipleBoundaries(float[] cellSize, float[] RSET, float[] midFlameWindspeed, int[][,] wuIarea, float[][,] ros, float[][,] azimuth)
         {
             _allBoundaries = new List<int[,]>();
 
             for (int i=0; i<cellSize.Length; i++)
             {
-                int[,] boundary = CalculateBoundary(cellSize[i], RSET[i], bufferTime, midFlameWindspeed[i], wuIarea[i], ros[i], azimuth[i]);
+                int[,] boundary = CalculateBoundary(cellSize[i], RSET[i], midFlameWindspeed[i], wuIarea[i], ros[i], azimuth[i]);
                 _allBoundaries.Add(boundary);
             }
 
