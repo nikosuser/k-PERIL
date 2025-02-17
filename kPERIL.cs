@@ -9,7 +9,10 @@ namespace kPERIL_DLL
         private List<int[,]> _allBoundaries;
         private int[] _rasterSize;
         private PERILData _data;
-
+        
+        /// <summary>
+        /// Constructor for kPERIL
+        /// </summary>
         public kPERIL() 
         {
             _rasterSize = new int[2];
@@ -19,16 +22,19 @@ namespace kPERIL_DLL
         /// <summary>
         /// This method represents one iteration.
         /// </summary>
-        /// <param name="cellSize">The square size of each raster (most commonly 30m)</param>
-        /// <param name="RSET">RSET time in minutes</param>
+        /// <param name="cellSize">The pixel size of all rasters (most commonly 30m)</param>
+        /// <param name="rset">RSET time in minutes</param>
         /// <param name="bufferTime"> Any additional buffer time desired on top of RSET</param>
         /// <param name="midFlameWindspeed">The wind speed in the midflame height, representing the entire domain (spatially and temporally)</param>
-        /// <param name="wuiArea">An X by 2 array listing points defining a polygon. This polygon is used as the urban area around which the boundary is calculated.The dimensions of each point are about the domain with (0,0) being the top left corner. </param>
+        /// <param name="windDir">Midflame wind direction</param>
+        /// <param name="wuiArea">An X by 2 array listing points defining a polygon. This polygon is used as the urban area around which the boundary is calculated.The dimensions of each point are about the domain with (0,0) being the top left corner. The WUI area must be defined by a single complete polygon, and the points should be ordered (clockwise or counterclockwise).</param>
         /// <param name="ros">The rate of spread magniture array of size X by Y, in meters per minute</param>
         /// <param name="azimuth">The rate of spread direction array of size X by Y, in degrees from north, clockwise</param>
+        /// <param name="slope">The slope of the terrain in degrees</param>
+        /// <param name="aspect">The aspect of the terrain in degrees</param>
         /// <param name="consoleOutput">Optional, used to capture any console messages from k-PERIL.</param>
         /// <returns>An X by Y array representing the landscape. Points are 1 if inside the boundary and 0 if outside.</returns>
-        public int[,] CalculateBoundary(float cellSize, float RSET, float midFlameWindspeed, int[,] wuiArea, float[,] ros, float[,] azimuth, System.IO.StringWriter consoleOutput = null)
+        public int[,] CalculateBoundary(float cellSize, float rset, float bufferTime, float midFlameWindspeed, float windDir, int[,] wuiArea, float[,] ros, float[,] azimuth, float[,] slope, float[,] aspect, System.IO.StringWriter consoleOutput = null)
         {
             //if we call from a non console program we need to be able to access the log/error messages
             if(consoleOutput != null)
@@ -43,37 +49,15 @@ namespace kPERIL_DLL
             _rasterSize[0] = xDim;
             _rasterSize[1] = yDim;
 
-            _data.SetData(cellSize, RSET, midFlameWindspeed, ros, azimuth, xDim, yDim);
+            _data.SetData(cellSize, rset + bufferTime, midFlameWindspeed, windDir, ros, azimuth, slope,aspect, xDim, yDim);
 
-            //Linearise the WUIarea array, get its boundary, and delinearise
-            int[,] wui = _data.Delinearise(_data.CompoundBoundary(_data.Linearise(wuiArea)));     
-            /*
-            Console.Write("WUI Boundary Nodes: ");//Output the WUI area boundary generated in the Console
-            for (int i = 0; i < WUI.GetLength(0); i++)
-            {
-                Console.Write(WUI[i, 0] + "," + WUI[i, 1] + "   ");
-            }
-            Console.WriteLine();
-            */
-
+            //get the boundary points of the WUI area only
+            int[,] wui = _data.CompoundBoundary(wuiArea);  
+            
+            //check the WUI points are in the fire raster, and the fire reaches the WUI points. The returned array is in 1D coordinates. 
             int[] wuInput = _data.CheckOutOfBounds(wui);
-
-            bool noFire = false;
-
-            for (int i = 0; i < wuInput.Length; i++)
-            {
-                if (wuInput[i].Equals(int.MaxValue))
-                {
-                    Console.WriteLine("FIRE DOES NOT SIGNIFICANTLY REACH THE AFFECTED AREA, PERIL WILL NOT TAKE THIS FIRE INTO ACCOUNT");
-                    noFire = true;
-                }
-            }
-
-            int[,] safetyMatrix = null;
-            if (!noFire)
-            {
-                safetyMatrix = _data.CalculateTriggerBuffer(wuInput);                 
-            }
+            
+            int[,] safetyMatrix = _data.CalculateTriggerBoundary(wuInput);        
 
             if(consoleOutput != null)
             {
@@ -83,28 +67,32 @@ namespace kPERIL_DLL
                 Console.SetOut(standardOutput);
                 Console.SetError(standardOutput);
             }            
-
             return safetyMatrix;           
         }
 
         /// <summary>
         /// The main callable method of k-PERIL.This method calculates multiple iterations and saves them within the object.
         /// </summary>
-        /// <param name="cellSize"> An array of The square size of each point (most commonly 30m) for each simulation</param>
-        /// <param name="RSET"> An array ofThe prescribed evacuation time, in minutes</param>
-        /// <param name="bufferTime"> Any additional buffer time desired on top of RSET</param>
-        /// <param name="midFlameWindspeed">An array of The wind speed in the midflame height, representing the entire domain (spatially and temporally)</param>
-        /// <param name="wuIarea">A jagged array of X by 2 array listing points defining a polygon. This polygon is used as the urban area around which the boundary is calculated.The dimensions of each point are about the domain with (0,0) being the top left corner. </param>
+        /// <param name="cellSize"> The pixel size of all matrices (most commonly 30m) for each simulation</param>
+        /// <param name="rset"> An array of the prescribed evacuation time, in minutes</param>
+        /// <param name="bufferTime"> An array of any additional buffer time desired on top of rset</param>
+        /// <param name="midFlameWindspeed">An array of the wind speed in the midflame height, representing the entire domain (spatially and temporally)</param>
+        /// <param name="windDir">Array of midflame wind direction</param>
+        /// <param name="wuIarea">An X by 2 array listing points defining a polygon. This polygon is used as the urban area around which the boundary is calculated.The dimensions of each point are about the domain with (0,0) being the top left corner. The polygon should be a single continuous shape, with points specified in either clockwise or counterclockwise order.</param>
         /// <param name="ros">A jagged array of The rate of spread magniture array of size X by Y, in meters per minute</param>
         /// <param name="azimuth">A jagged array of The rate of spread direction array of size X by Y, in degrees from north, clockwise</param>
-        /// <returns>An X by Y array representing the landscape. Points are 1 if inside the boundary and 0 if outside.</returns>
-        public List<int[,]> CalculateMultipleBoundaries(float[] cellSize, float[] RSET, float[] midFlameWindspeed, int[][,] wuIarea, float[][,] ros, float[][,] azimuth)
+        /// <param name="slope">Slope of the terrain in degrees</param>
+        /// <param name="aspect">Aspect of the terrain in degrees</param>
+        /// <param name="consoleOutput">Optional, used to capture any console messages from k-PERIL.</param>
+        /// <returns>A list of X by Y arrays representing the landscape. Points in each array are 1 if inside the boundary and 0 if outside.</returns>
+        public List<int[,]> CalculateMultipleBoundaries(float cellSize, float[] rset, float[] bufferTime, float[] midFlameWindspeed, float[] windDir, int[,] wuIarea, float[][,] ros, float[][,] azimuth, float[,] slope, float[,] aspect, System.IO.StringWriter consoleOutput = null)
         {
             _allBoundaries = new List<int[,]>();
 
-            for (int i=0; i<cellSize.Length; i++)
+            for (int i=0; i<ros.Length; i++)
             {
-                int[,] boundary = CalculateBoundary(cellSize[i], RSET[i], midFlameWindspeed[i], wuIarea[i], ros[i], azimuth[i]);
+                int[,] boundary = CalculateBoundary(cellSize, rset[i], bufferTime[i], midFlameWindspeed[i], windDir[i],
+                    wuIarea, ros[i], azimuth[i], slope, aspect, consoleOutput);
                 _allBoundaries.Add(boundary);
             }
 
@@ -129,7 +117,7 @@ namespace kPERIL_DLL
                 {
                     for (int j = 0; j < _rasterSize[1]; j++)
                     {
-                        output[i, j] = output[i, j] + boundary[i, j];
+                        output[i, j] += boundary[i, j];
                     }
                 }
             }
@@ -144,10 +132,14 @@ namespace kPERIL_DLL
         {
             return _allBoundaries;
         }
-
-        public static int[,] GetLineBoundary(int[,] compoundBoundary)          //Method to get the boundary line from a safety matrix (unlike getCompoundBoundary which needs multiple safety matrices in one matrix to work)
+        
+        /// <summary>
+        /// Method to get the overall boundary line from a probabilistic boundary 
+        /// </summary>
+        /// <param name="compoundBoundary">The 2D raster of the probabilistic trigger boundary</param>
+        /// <returns>A coordinates list of X by 2 of the points on the line boundary </returns>
+        public static int[,] GetLineBoundary(int[,] compoundBoundary)
         {
-
             List<int> uniqueBoundary = new List<int>();
 
             for (int x = 1; x < compoundBoundary.GetLength(0)-1; x++)
@@ -167,10 +159,8 @@ namespace kPERIL_DLL
             int[,] output = new int[uniqueBoundary.Count, 2]; 
             int count = 0;
 
-            //For every boundary point, add its X and Y values to the output matrix
             foreach (int boundaryPoint in uniqueBoundary)                         
             {
-                //Added the +1 since the indices in the cartesian system must start from 1
                 output[count, 0] = (boundaryPoint % compoundBoundary.GetLength(1))+1;   
                 output[count, 1] = (boundaryPoint / compoundBoundary.GetLength(1))+1;
                 count++;
@@ -179,34 +169,6 @@ namespace kPERIL_DLL
             //return the new boundary matrix, should only include the edge nodes
             return output;   
 
-        }
-
-        public static int[,] GetDenseBoundaryFromProbBoundary(int[,] probBoundary, int noOfLines)
-        {
-            int[,] isolatedBoundary = new int[probBoundary.GetLength(0), probBoundary.GetLength(1)];
-
-            int[,] outputBoundary = new int[probBoundary.GetLength(0), probBoundary.GetLength(1)];
-
-            int minimumPass = probBoundary.Cast<int>().Max() / noOfLines;
-
-            for (int i = 0; i < noOfLines; i++)
-            {
-                for (int j = 0; j < probBoundary.GetLength(0); j++)
-                {
-                    for (int k = 0; k < probBoundary.GetLength(1); k++)
-                    {
-                        if (probBoundary[j, k] > minimumPass * i)
-                        {
-                            isolatedBoundary[j, k] = probBoundary[j, k];
-                        }
-                        else
-                        {
-                            isolatedBoundary[j, k] = 0;
-                        }
-                    }
-                }
-            } 
-            return outputBoundary;
         }
 
         /// <summary>
@@ -242,7 +204,11 @@ namespace kPERIL_DLL
             }
             return Get2DarrayFromIntList(allNodes);
         }
-
+        /// <summary>
+        /// Find all integer-coordinate points between two points
+        /// </summary>
+        /// <param name="endNodes"> 2 x 2 array containing the coordinates of the start and end point</param>
+        /// <returns>2D array of all integer coordinate points between the stard and end points.</returns>
         private int[,] GetAllNodesBetween(int[,] endNodes)
         {
             double x1 = endNodes[0, 0];
@@ -259,9 +225,7 @@ namespace kPERIL_DLL
 
             int tempY = (int)y1;
             int tempX = (int)x1;
-
-
-
+            
             if (Math.Abs(y2 - y1) < Math.Abs(x2 - x1))   //along X
             {
                 int i = 0;
@@ -292,7 +256,7 @@ namespace kPERIL_DLL
                     }
                     else
                     {
-                        Console.WriteLine("Something went wrong with the math");
+                        Console.WriteLine($"Failed to calculate all nodes between points {x1}, {y1} and {x2}, {y2}");
                         return endNodes;
                     }
                 }
@@ -327,15 +291,18 @@ namespace kPERIL_DLL
                     }
                     else
                     {
-                        Console.WriteLine("Something went wrong with the math");
+                        Console.WriteLine($"Failed to calculate all nodes between points {x1}, {y1} and {x2}, {y2}");
                         return endNodes;
                     }
                 }
             }
-
             return Get2DarrayFromIntList(allNodes);
         }
-
+        /// <summary>
+        /// Convert List of 2 element arrays to 2D array of points. 
+        /// </summary>
+        /// <param name="list">List of point coordinates (2 element arrays).</param>
+        /// <returns>X by 2 array of point coordinates </returns>
         private int[,] Get2DarrayFromIntList(List<int[]> list)
         {
             int[][] jaggedArray = list.Distinct().ToArray();
@@ -349,9 +316,5 @@ namespace kPERIL_DLL
             return output;
         }
 
-        internal static int[,] GetRasterBoundaryFromProbBoundary(int[,] safetyMatrix, float v)
-        {
-            throw new NotImplementedException();
-        }
     }
 }
