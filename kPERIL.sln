@@ -17,10 +17,10 @@ Global
 		{E99C6856-681E-4D9E-97EC-A1EA0CD37FF3}.Debug|Any CPU.Build.0 = Release|x86
 		{E99C6856-681E-4D9E-97EC-A1EA0CD37FF3}.Debug|x86.ActiveCfg = Debug|ARM32
 		{E99C6856-681E-4D9E-97EC-A1EA0CD37FF3}.Debug|x86.Build.0 = Debug|ARM32
-		{E99C6856-681E-4D9E-97EC-A1EA0CD37FF3}.Release|Any CPU.ActiveCfg = Release|x86
-		{E99C6856-681E-4D9E-97EC-A1EA0CD37FF3}.Release|Any CPU.Build.0 = Release|x86
 		{E99C6856-681E-4D9E-97EC-A1EA0CD37FF3}.Release|x86.ActiveCfg = Release|x86
 		{E99C6856-681E-4D9E-97EC-A1EA0CD37FF3}.Release|x86.Build.0 = Release|x86
+		{E99C6856-681E-4D9E-97EC-A1EA0CD37FF3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E99C6856-681E-4D9E-97EC-A1EA0CD37FF3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Linq;
 
 namespace kPERIL_DLL
@@ -9,14 +11,16 @@ namespace kPERIL_DLL
         private List<int[,]> _allBoundaries;
         private int[] _rasterSize;
         private PERILData _data;
+        private bool _debug;
         
         /// <summary>
         /// Constructor for kPERIL
         /// </summary>
-        public kPERIL() 
+        public kPERIL(bool debug) 
         {
             _rasterSize = new int[2];
             _data = new PERILData(this);
+            _debug = debug;
         }
 
         /// <summary>
@@ -25,8 +29,8 @@ namespace kPERIL_DLL
         /// <param name="cellSize">The pixel size of all rasters (most commonly 30m)</param>
         /// <param name="rset">RSET time in minutes</param>
         /// <param name="bufferTime"> Any additional buffer time desired on top of RSET</param>
-        /// <param name="midFlameWindspeed">The wind speed in the midflame height, representing the entire domain (spatially and temporally)</param>
-        /// <param name="windDir">Midflame wind direction</param>
+        /// <param name="midFlameWindspeed">The wind speed in the midflame height, raster (spatial, depending on the fire arrival time)</param>
+        /// <param name="windDir">Midflame wind direction raster (spatial, depending on the fire arrival time).</param>
         /// <param name="wuiArea">An X by 2 array listing points defining a polygon. This polygon is used as the urban area around which the boundary is calculated.The dimensions of each point are about the domain with (0,0) being the top left corner. The WUI area must be defined by a single complete polygon, and the points should be ordered (clockwise or counterclockwise).</param>
         /// <param name="ros">The rate of spread magniture array of size X by Y, in meters per minute</param>
         /// <param name="azimuth">The rate of spread direction array of size X by Y, in degrees from north, clockwise</param>
@@ -34,7 +38,7 @@ namespace kPERIL_DLL
         /// <param name="aspect">The aspect of the terrain in degrees</param>
         /// <param name="consoleOutput">Optional, used to capture any console messages from k-PERIL.</param>
         /// <returns>An X by Y array representing the landscape. Points are 1 if inside the boundary and 0 if outside.</returns>
-        public int[,] CalculateBoundary(float cellSize, float rset, float bufferTime, float midFlameWindspeed, float windDir, int[,] wuiArea, float[,] ros, float[,] azimuth, float[,] slope, float[,] aspect, System.IO.StringWriter consoleOutput = null)
+        public int[,] CalculateBoundary(float cellSize, float rset, float bufferTime, float[,] midFlameWindspeed, float[,] windDir, int[,] wuiArea, float[,] ros, float[,] azimuth, float[,] slope, float[,] aspect, System.IO.StringWriter consoleOutput = null)
         {
             //if we call from a non console program we need to be able to access the log/error messages
             if(consoleOutput != null)
@@ -66,7 +70,13 @@ namespace kPERIL_DLL
                 standardOutput.AutoFlush = true;
                 Console.SetOut(standardOutput);
                 Console.SetError(standardOutput);
-            }            
+            }
+
+            if (_debug)
+            {
+                _data.debugExport("D:\\OneDrive - Imperial College London\\Desktop\\kPerilTest/debug/");
+            }
+            
             return safetyMatrix;           
         }
 
@@ -76,8 +86,8 @@ namespace kPERIL_DLL
         /// <param name="cellSize"> The pixel size of all matrices (most commonly 30m) for each simulation</param>
         /// <param name="rset"> An array of the prescribed evacuation time, in minutes</param>
         /// <param name="bufferTime"> An array of any additional buffer time desired on top of rset</param>
-        /// <param name="midFlameWindspeed">An array of the wind speed in the midflame height, representing the entire domain (spatially and temporally)</param>
-        /// <param name="windDir">Array of midflame wind direction</param>
+        /// <param name="midFlameWindspeed">An array of the wind speed in the midflame height raster (spatial, depending on the fire arrival time)</param>
+        /// <param name="windDir">Array of midflame wind direction raster (spatial, depending on the fire arrival time)</param>
         /// <param name="wuIarea">An X by 2 array listing points defining a polygon. This polygon is used as the urban area around which the boundary is calculated.The dimensions of each point are about the domain with (0,0) being the top left corner. The polygon should be a single continuous shape, with points specified in either clockwise or counterclockwise order.</param>
         /// <param name="ros">A jagged array of The rate of spread magniture array of size X by Y, in meters per minute</param>
         /// <param name="azimuth">A jagged array of The rate of spread direction array of size X by Y, in degrees from north, clockwise</param>
@@ -85,7 +95,7 @@ namespace kPERIL_DLL
         /// <param name="aspect">Aspect of the terrain in degrees</param>
         /// <param name="consoleOutput">Optional, used to capture any console messages from k-PERIL.</param>
         /// <returns>A list of X by Y arrays representing the landscape. Points in each array are 1 if inside the boundary and 0 if outside.</returns>
-        public List<int[,]> CalculateMultipleBoundaries(float cellSize, float[] rset, float[] bufferTime, float[] midFlameWindspeed, float[] windDir, int[,] wuIarea, float[][,] ros, float[][,] azimuth, float[,] slope, float[,] aspect, System.IO.StringWriter consoleOutput = null)
+        public List<int[,]> CalculateMultipleBoundaries(float cellSize, float[] rset, float[] bufferTime, float[][,] midFlameWindspeed, float[][,] windDir, int[,] wuIarea, float[][,] ros, float[][,] azimuth, float[,] slope, float[,] aspect, System.IO.StringWriter consoleOutput = null)
         {
             _allBoundaries = new List<int[,]>();
 
@@ -316,5 +326,33 @@ namespace kPERIL_DLL
             return output;
         }
 
+        public (float[,], float[,]) ConvertTemporalToSpatialWind(float[] windMag, float[] windDir, DateTime[] rawsTimes,
+            float[,] arrivalTime)
+        {
+            float[,] windMagRaster = new float[arrivalTime.GetLength(0), arrivalTime.GetLength(1)];
+            float[,] windDirRaster = new float[arrivalTime.GetLength(0), arrivalTime.GetLength(1)];
+            for (int i = 0; i < arrivalTime.GetLength(0); i++)
+            {
+                for (int j = 0; j < arrivalTime.GetLength(1); j++)
+                {
+                    if (arrivalTime[i, j] >= 0)
+                    {
+                        int count = 0;
+                        double timeDiff = 200;
+                        while (timeDiff < 60)
+                        {
+                            timeDiff = (rawsTimes[count] - rawsTimes[0]).TotalMinutes - arrivalTime[i, j];
+                            count++;
+                        }
+                        windMagRaster[i, j] =
+                            windMag[count] * (float)(timeDiff / 60) + windMag[count + 1] * (float)(1 - timeDiff / 60);
+                        windDirRaster[i, j] =
+                            windDir[count] * (float)(timeDiff / 60) + windDir[count + 1] * (float)(1 - timeDiff / 60);
+                    }
+                }
+            }
+            return (windMagRaster, windDirRaster);
+        }
+        
     }
 }

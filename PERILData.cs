@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Linq;
 
 namespace kPERIL_DLL
@@ -9,11 +11,11 @@ namespace kPERIL_DLL
         private float[,] _azimuth;               //Rate of spread Direction
         private float[,] _ros;                   //Rate of Spread Magnitude
         private float[,] _slope;                //terrain slope in deg 0 - 100
-    private float[,] _aspect;                   //terrain aspect in deg 0 - 360
+        private float[,] _aspect;                   //terrain aspect in deg 0 - 360
         private float[,] _rosTheta;              //rate of spread split onto the eight cardinal directions
         private float[,] _effectiveMidflameWindspeed; //Effective windspeed for ellipse calculations (accounts for wind and slope)
-        private float _u;                        //Mid-flame wind speed
-        private float _windDir;
+        private float[,] _u;                        //Mid-flame wind speed (spatial)
+        private float[,] _windDir;               //wind direction (spatial)
         private int _totalY;                     //Total raster size in Y
         private int _totalX;                     //Total raster size in X
         private int[] nonBoundaryPoints;                     //linearised array of all the non-boundary nodes
@@ -24,16 +26,12 @@ namespace kPERIL_DLL
         private bool _haveData = false;
         private kPERIL _perilOwner;
 
-        public float[] DebugMatrix;             //debug purposes
-
-        readonly static float sqrt2 = (float)Math.Sqrt(2.0);
-
         public PERILData(kPERIL perilOwner)
         {
             _perilOwner = perilOwner;
         }
 
-        public void SetData(float cell, float RSET, float u, float windDir, float[,] ros, float[,] azimuth, float[,] slope, float[,] aspect, int totalX, int totalY)
+        public void SetData(float cell, float RSET, float[,] u, float[,] windDir, float[,] ros, float[,] azimuth, float[,] slope, float[,] aspect, int totalX, int totalY)
         {
             _cell = cell;
             _triggerBuffer = RSET;
@@ -47,12 +45,16 @@ namespace kPERIL_DLL
             _totalY = totalY;
 
             _haveData = true;
+            
+            
         }
 
         public int[,] CalculateTriggerBoundary(int[] wuInput)
         {
             if (_haveData)
             {
+                GetEffectiveWindWithSlope(); 
+                
                 CalculateRosTheta();
                 //Console.WriteLine("ROS_THETA GENERATED");                                       
 
@@ -94,7 +96,7 @@ namespace kPERIL_DLL
             {
                 for (int y = 0; y < totalY; y++)
                 {
-                    double lb = 0.936 * Math.Exp(0.2566 * _effectiveMidflameWindspeed[x,y]) + 0.461 * Math.Exp(-0.1548 * _effectiveMidflameWindspeed[x,y]) - 0.397; //Calculate length to Breadth ratio of Huygens ellipse
+                    double lb = 0.936 * Math.Exp(0.2566 * this._effectiveMidflameWindspeed[x,y]) + 0.461 * Math.Exp(-0.1548 * _effectiveMidflameWindspeed[x,y]) - 0.397; //Calculate length to Breadth ratio of Huygens ellipse
                     double hb = (lb + (float)Math.Sqrt(lb * lb - 1)) / (lb - (float)Math.Sqrt(lb * lb - 1));    //calculate head to back ratio
                     
                     a = (_ros[x, y] / (2 * (float)lb)) * (1 + 1 / (float)hb);
@@ -473,7 +475,6 @@ namespace kPERIL_DLL
                 {
                     allDistances[j, i] = temp[j];
                 }
-                DebugMatrix = temp;
             }
 
             int[,] safetyMatrix = new int[_totalX, _totalY];
@@ -500,7 +501,7 @@ namespace kPERIL_DLL
             int[] wuInput = new int[wuiBoundary.GetLength(0)];
 
             //create a temporary Out of bounds vector 
-            int[] ooBfixer = new int[2];
+            int[] modifiedCoordinates = new int[2];
             
             float minDistance = int.MaxValue;
 
@@ -508,14 +509,14 @@ namespace kPERIL_DLL
             for (int i = 0; i < wuiBoundary.GetLength(0); i++)
             {
                 CheckGeneralOutOfBounds(wuiBoundary[i, 0], wuiBoundary[i, 1]);
-                ooBfixer = CheckFireOutOfBounds(wuiBoundary[i, 0], wuiBoundary[i, 1], out float tempDistance);
+                modifiedCoordinates = CheckFireOutOfBounds(wuiBoundary[i, 0], wuiBoundary[i, 1], out float tempDistance);
 
                 if (minDistance > tempDistance)
                 {
                     minDistance = tempDistance;
                 }
                 //Linearise WUI accordingly
-                wuInput[i] = (ooBfixer[0] - 1) * _totalY + ooBfixer[1];
+                wuInput[i] = (modifiedCoordinates[0] - 1) * _totalY + modifiedCoordinates[1];
             }
 
             if (minDistance > _cell * 6)
@@ -523,35 +524,70 @@ namespace kPERIL_DLL
                 throw new Exception(
                     "ERROR: The fire has a minimum distance to the WUI area greater than 6 cells worth. Either redo the wildfire simulation with more time or redraw the WUI area");
             }
+            //return LineariseArray(wuiBoundary);
             return wuInput;
         }
 
         private void GetEffectiveWindWithSlope()
         {
-            // Convert degrees to radians
-            double radWindDir = _windDir * Math.PI / 180.0;
-
-            // Convert polar coordinates to Cartesian (x, y)
-            double x2 = _u * Math.Cos(radWindDir);
-            double y2 = _u * Math.Sin(radWindDir);
-            
+            float[,] effectiveMidflameWindspeed = new float[_totalX, _totalY];
             for (int i = 0; i < _totalX; i++)
             {
                 for (int j = 0; j < _totalY; j++)
                 {
                     double effectiveSlopeWind = 0.06f * _slope[i, j];
 
-                    double radSlopeUpDir = (_azimuth[i, j] + 180) * Math.PI / 180.0;
+                    // Convert degrees to radians
+                    double radWindDir = _windDir[i,j] * Math.PI / 180.0;
+
+                    // Convert polar coordinates to Cartesian (x, y)
+                    double x2 = _u[i,j] * Math.Cos(radWindDir);
+                    double y2 = _u[i,j] * Math.Sin(radWindDir);
+                    
+                    double radSlopeUpDir = (_aspect[i, j] + 180) * Math.PI / 180.0;
                     double x1 = effectiveSlopeWind * Math.Cos(radSlopeUpDir);
                     double y1 = effectiveSlopeWind * Math.Sin(radSlopeUpDir);
                     
                     double xResult = x1 + x2;
                     double yResult = y1 + y2;
                     
-                    _effectiveMidflameWindspeed[i,j] = (float)Math.Sqrt(xResult * xResult + yResult * yResult);
+                    effectiveMidflameWindspeed[i,j] = (float)Math.Sqrt(xResult * xResult + yResult * yResult);
                     //double resultDirection = Math.Atan2(yResult, xResult) * 180.0 / Math.PI;
                 }
             }
+            _effectiveMidflameWindspeed= effectiveMidflameWindspeed;
+        }
+        public void exportRaster(float[,] raster, string filePath)
+        {
+            int rows = raster.GetLength(0);
+            int cols = raster.GetLength(1);
+
+            using (StreamWriter writer = new StreamWriter(filePath))
+            {
+                for (int i = 0; i < rows; i++)
+                {
+                    for (int j = 0; j < cols; j++)
+                    {
+                        writer.Write(raster[j, i].ToString(CultureInfo.InvariantCulture));
+
+                        // Add space separator, except for the last column
+                        if (j < cols - 1)
+                            writer.Write(" ");
+                    }
+                    writer.WriteLine(); // New line after each row
+                }
+            }
+
+            Console.WriteLine($"Matrix saved successfully to {filePath}");
+        }
+
+        public void debugExport(string outputFolder)
+        {
+            exportRaster(_rosTheta,outputFolder+"rosTheta.txt");
+            exportRaster(_effectiveMidflameWindspeed,outputFolder+"effectiveMidflameWindspeed.txt");
+            exportRaster(_u,outputFolder+"u.txt");
+            exportRaster(_windDir,outputFolder+"windDir.txt");
+            //exportRaster();
         }
     }   
 }
