@@ -1,11 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk;Microsoft.NET.Sdk.Publish">
   <PropertyGroup>
-    <OutputType>Library</OutputType>
+    <OutputType>Exe</OutputType>
     <TargetFramework>net481</TargetFramework>
     <Platforms>AnyCPU;x86</Platforms>
     <DockerDefaultTargetOS>Windows</DockerDefaultTargetOS>
     <DockerfileContext>.</DockerfileContext>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <LangVersion>default</LangVersion>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

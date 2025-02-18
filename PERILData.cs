@@ -106,7 +106,7 @@ namespace kPERIL_DLL
                     for (int cardinal = 0; cardinal < 8; cardinal++)
                     {
                         //if the cell is active i.e. has been burned in the simulation
-                        if (_azimuth[y, x] > 0)
+                        if (_azimuth[y, x] >= 0)
                         {
                             rosX = a * Math.Sin((Math.PI * cardinal / 4) - _azimuth[y, x] * 2 * Math.PI / 360);
                             rosY = c + b * Math.Cos((Math.PI * cardinal / 4) - _azimuth[y, x] * 2 * Math.PI / 360);
@@ -128,7 +128,7 @@ namespace kPERIL_DLL
         /// </summary>
         private void SetNonBoundaryPoints()
         {
-            nonBoundaryPoints = new int[(_totalX - 1) * (_totalY - 1)];
+            nonBoundaryPoints = new int[(_totalX - 2) * (_totalY - 2)];
             int index = 0;
             for (int i = 1; i < _totalX - 1; i++)
             {
@@ -297,7 +297,7 @@ namespace kPERIL_DLL
             minDistance = int.MaxValue;
             
             //if the WUI is on an inactive note
-            if (_ros[wuIy, wuIx] < 0)
+            if (_ros[wuIx, wuIy] < 0)
             {
                 float tryout = int.MaxValue;
 
@@ -307,7 +307,7 @@ namespace kPERIL_DLL
                     {
                         if (_ros[i, j] >= 0)
                         {
-                            tryout = (float)Math.Sqrt(Math.Pow(Math.Abs(i - wuIy), 2) + Math.Pow(Math.Abs(j - wuIx), 2));
+                            tryout = (float)Math.Sqrt(Math.Pow(Math.Abs(i - wuIx), 2) + Math.Pow(Math.Abs(j - wuIy), 2));
                             if (minDistance > tryout)
                             {
                                 minDistance = tryout;      
@@ -317,6 +317,10 @@ namespace kPERIL_DLL
                         }
                     }
                 }
+            }
+            else
+            {
+                minDistance = 0;
             }
             //return new WUI area. If WUI was originally on an active node then no change occurs, it returns the original WUI point
             return newWui;
@@ -396,45 +400,67 @@ namespace kPERIL_DLL
         /// <returns>Time for fire to reach WUI point for all points in the raster</returns>
         private float[] BreadthFirstSearch(int wui)
         {
-            bool[] visited = new bool[_graph.GetLength(0)];
+            int totalNodes = _graph.GetLength(0);
             Queue<int> upNext = new Queue<int>();
-            float[] distance = new float[_graph.GetLength(0)];
-            
-            int currentNode = 0;
+            float[] distance = new float[totalNodes];
+            bool[] enqueued = new bool[totalNodes];  // Tracks whether a node has been enqueued
 
-            for (int i = 0; i < _graph.GetLength(0); i++)
+            // Initialize distances and enqueued flags
+            for (int i = 0; i < totalNodes; i++)
             {
-                visited[i] = false;
-                distance[i] = int.MaxValue;
+                distance[i] = float.MaxValue;
+                enqueued[i] = false;
             }
 
+            // Optionally, you might want to set the starting node's distance to 0 instead of 1,
+            // unless 1 is meaningful for your application.
             upNext.Enqueue(wui);
+            enqueued[wui] = true;
             distance[wui] = 1;
 
-            while (upNext.Count() != 0)
+            while (upNext.Count > 0)
             {
-                currentNode = upNext.Peek();
-                for (int i = 0; i < 8; i++)
+                int currentNode = upNext.Dequeue();  // Remove and get the current node
+
+                // Skip processing if the node is on the boundary
+                if (IsOnBoundary(currentNode))
+                    continue;
+
+                // Loop over all possible neighbors (using the second dimension of _graph)
+                for (int i = 0; i < _graph.GetLength(1); i++)
                 {
-                    //Try, to avoid errors when the neighbor of the currrent node is in the edge of the analysis raster
-                    if (IsOnBoundary(currentNode) == false)
+                    int neighbor = pointNeightborSet[currentNode, i];
+                    if (neighbor == 0)
+                        continue;  // Skip invalid neighbor entries
+
+                    // Ensure the edge weight is valid
+                    if (_graph[currentNode, i] <= 0)
+                        continue;
+
+                    // Calculate the new distance from the start node
+                    float newDistance = distance[currentNode] + _graph[currentNode, i];
+
+                    // If we found a shorter path, update the distance.
+                    if (newDistance < distance[neighbor])
                     {
-                        if (pointNeightborSet[currentNode, i] != 0 && distance[currentNode] + _graph[currentNode, i] < distance[pointNeightborSet[currentNode, i]] && _graph[currentNode, i] > 0)
+                        distance[neighbor] = newDistance;
+
+                        // If the neighbor meets your trigger conditions and isn't already queued, enqueue it.
+                        // (Note: Adjust _triggerBuffer and _ros as needed for your logic.)
+                        if (newDistance <= _triggerBuffer &&
+                            !enqueued[neighbor] &&
+                            _ros[(int)(neighbor / _ros.GetLength(0)), neighbor % _ros.GetLength(0)] > 0)
                         {
-                            distance[pointNeightborSet[currentNode, i]] = distance[currentNode] + _graph[currentNode, i];
-                            if (!visited[pointNeightborSet[currentNode, i]] && distance[pointNeightborSet[currentNode, i]] <= this._triggerBuffer && !(upNext.Contains(pointNeightborSet[currentNode, i])) && _ros[pointNeightborSet[currentNode, i] % _ros.GetLength(0), (int)(pointNeightborSet[currentNode, i] / _ros.GetLength(0))] < 0)
-                            {
-                                //add neighbor node to up next list
-                                upNext.Enqueue(pointNeightborSet[currentNode, i]);
-                            }
+                            upNext.Enqueue(neighbor);
+                            enqueued[neighbor] = true;
                         }
                     }
                 }
-                visited[currentNode] = true;
-                upNext.Dequeue();
             }
+
             return distance;
         }
+
 
         /// <summary>
         /// Check that point is on the boundary of the simulation raster
@@ -471,12 +497,12 @@ namespace kPERIL_DLL
                 Console.Write("\r Generating Boundary: WUI Nodes Complete: {0}%", i * 100 / wuInput.Length);
 
                 float[] temp = BreadthFirstSearch(wuInput[i]);
-                for (int j = 0; j < _graph.GetLength(0); j++)
+                for (int j = 0; j < temp.Length; j++)
                 {
                     allDistances[j, i] = temp[j];
                 }
             }
-
+            
             int[,] safetyMatrix = new int[_totalX, _totalY];
             int[] safetyMatrix1D = GetBoundary(allDistances);
 
@@ -568,7 +594,7 @@ namespace kPERIL_DLL
                 {
                     for (int j = 0; j < cols; j++)
                     {
-                        writer.Write(raster[j, i].ToString(CultureInfo.InvariantCulture));
+                        writer.Write(raster[i, j].ToString(CultureInfo.InvariantCulture));
 
                         // Add space separator, except for the last column
                         if (j < cols - 1)
