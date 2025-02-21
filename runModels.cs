@@ -315,7 +315,7 @@ namespace RoxCaseGen
                     currTime = please.RawStartTime;
                     List<string> wxsOutput = new List<string>();
                     List<string> fmsOutput = new List<string>();
-                    for (int i = 1; i < please.Fmc.GetLength(0); i++)
+                    for (int i = 0; i < please.Fmc.GetLength(0); i++)
                     {
                         fmsOutput.Add($" {please.Fmc[i,0]} {please.Fmc[i,1]} {please.Fmc[i,2]} {please.Fmc[i,3]} {please.Fmc[i,4]} {please.Fmc[i,5]}");
                     }
@@ -503,13 +503,13 @@ namespace RoxCaseGen
                     
                     Thread.Sleep(8000);
                     */
-                    string[] wisEresults =
+                    string[] wiseResults =
                         Directory.GetDirectories(@"C:\\jobs", "job_*", SearchOption.TopDirectoryOnly);
-                    if (wisEresults.Length > 0)
+                    if (wiseResults.Length > 0)
                     {
-                        for (int i = 0; i < wisEresults.Length; i++)
+                        for (int i = 0; i < wiseResults.Length; i++)
                         {
-                            Directory.Delete(wisEresults[i], true);
+                            Directory.Delete(wiseResults[i], true);
                         }
                     }
 
@@ -519,15 +519,15 @@ namespace RoxCaseGen
                         $@"& './WISE Preprocessor.exe' '{path}\WISE\wise_in.txt'"
                     ], @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",";");
                     
-                    wisEresults =
+                    wiseResults =
                         Directory.GetDirectories(@"C:\\jobs", "job_*", SearchOption.TopDirectoryOnly);
-                    while (wisEresults.Length == 0)
+                    while (wiseResults.Length == 0)
                     {
-                        wisEresults =
+                        wiseResults =
                             Directory.GetDirectories(@"C:\\jobs", "job_*", SearchOption.TopDirectoryOnly);
                         Thread.Sleep(1000);
                     }
-                    RunCommand(["cd 'C:/Program Files/WISE/'",@$".\wise.exe -t '{wisEresults[0]}\job.fgmj'"],@"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",";");
+                    RunCommand(["cd 'C:/Program Files/WISE/'",@$".\wise.exe -t '{wiseResults[0]}\job.fgmj'"],@"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",";");
                     
                     Console.WriteLine("Killing WISE Builder");
                     //procBuilder.Kill();

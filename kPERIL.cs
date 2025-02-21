@@ -93,16 +93,16 @@ namespace k_PERIL_DLL
         private int _totalY;                     //Total raster size in Y
         private int _totalX;                     //Total raster size in X
         private int[] _rosn;                     //linearised array of all the non-boundary nodes
-        private float _cell;                       //cell size (m)
         private int _tBuffer;                    //trigger buffer time in minutes
         private int[,] _rosloc;                  //tracks the cardinal neighbors of each linearised cell.
         private float[,] _graph;                 //variable to store the weight values for the target node
 
         public float[] DebugMatrix;             //debug purposes
-
+        public float minDistanceToWildfire;
+        public float cell;                       //cell size (m)
         public void SetValues(float cell, int tBuffer, float u, float[,] ros, float[,] azimuth, int totalX, int totalY)
         {
-            this._cell = cell;
+            this.cell = cell;
             this._tBuffer = tBuffer;
             this._u = u;
             this._ros = ros;
@@ -197,11 +197,11 @@ namespace k_PERIL_DLL
                     {
                         if (j % 2 == 0)                                         //if the point is N S E or W
                         {
-                            weight[point, j] = (_cell / 2) * ((1 / _roStheta[point, (j + 4) % 8]) + (1 / _roStheta[_rosloc[point, j], (j + 4) % 8]));                         //calculate weight
+                            weight[point, j] = (cell / 2) * ((1 / _roStheta[point, (j + 4) % 8]) + (1 / _roStheta[_rosloc[point, j], (j + 4) % 8]));                         //calculate weight
                         }
                         else                                                    //if the point is a corner node (have to account for a longer distance)
                         {
-                            weight[point, j] = (float)Math.Sqrt(2) * (_cell / 2) * ((1 / _roStheta[point, (j + 4) % 8]) + (1 / _roStheta[_rosloc[point, j], (j + 4) % 8]));   //calculate weight
+                            weight[point, j] = (float)Math.Sqrt(2) * (cell / 2) * ((1 / _roStheta[point, (j + 4) % 8]) + (1 / _roStheta[_rosloc[point, j], (j + 4) % 8]));   //calculate weight
                         }
                         linearIndex++;                                          //advance linear index
                     }
@@ -252,9 +252,7 @@ namespace k_PERIL_DLL
                 return newWui;
             }
             if (_ros[wuIy, wuIx] == -9999)                           //if the WUI is on an inactive note
-            {   //show error message
-                Console.Write("WARNING: WUI POINT OUT OF FIRE BOUNDS, SUBSTITUTING FOR CLOSEST ACTIVE NODE. ");
-
+            {
                 float minDistance = int.MaxValue;                       //create new minimum distance variable, set it to infinite. 
                 float tryout = int.MaxValue;                            //create new calculated distance variable, set it to infinite. 
 
@@ -274,7 +272,7 @@ namespace k_PERIL_DLL
                         }
                     }
                 }
-                Console.WriteLine("NEW NODE: X = " + newWui[0] + " ,Y = " + newWui[1]);    //output it on console
+                this.minDistanceToWildfire = minDistance;
             }
             return newWui;  //return new WUI area. If WUI was originally on an active node then no change occurs and it returns the original WUI point
         }
@@ -487,6 +485,11 @@ namespace k_PERIL_DLL
                 int[,] safetyMatrix = solver.GetSafetyMatrix(wuInput);
                 Console.WriteLine("BOUNDARY GENERATED");                                        //console confirmation message
 
+                Console.WriteLine($"Minimum Distance from WUI to Fire: {solver.minDistanceToWildfire} cells");
+                if (solver.minDistanceToWildfire > solver.cell * 8)
+                {
+                    Console.WriteLine("WARNING: Wildfire is significantly far from Urban area!");
+                }
                 return safetyMatrix;
             }
             return null;

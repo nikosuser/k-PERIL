@@ -89,12 +89,6 @@ namespace RoxCaseGen
             {
                 Console.WriteLine("RUNPATH is not set.");
             }
-
-            const int conditioningDays = 30;
-            const int burnHours = 1500;
-            const int cellsize = 200;
-            const bool mlTrain = false;
-            const bool continueFromPrevious = false;
             
             string[] models = { "Farsite",
                 "WISE", 
@@ -102,6 +96,12 @@ namespace RoxCaseGen
                 "EPD", 
                 "LSTM", 
                 "FDS LS1"};
+
+            const int conditioningDays = 30;
+            int[] burnHours = [1000,600,600,600,600,600];
+            const int cellsize = 200;
+            const bool mlTrain = false;
+            const bool continueFromPrevious = false;
             
             //cd C:\WISE_Builder-1.0.6-beta.5; java -jar WISE_Builder.jar -s -j C:\jobs
             
@@ -133,6 +133,7 @@ namespace RoxCaseGen
                     Directory.Delete(path+ "/Log/", true);
                 }
                 File.Delete(path + "/log.txt");
+                File.Delete(path + "/times.txt");
                 Directory.CreateDirectory(path+ "/Log/");
                 ModelSetup.CleanupIters(path+"/FDS LS1/");
                 ModelSetup.CleanupIters(path+"/FDS LS4/");
@@ -167,7 +168,6 @@ namespace RoxCaseGen
             ModelSetup.Output_ASC_File(header,wui, path + "/WUIboundary.txt");       //save the used urban nodes in file for debugging/visualisation/further inspection.
             
             please.SetValues(path);
-            please.BurnHours = burnHours;
             please.ConditioningDays = conditioningDays;
             please.Cellsize = cellsize;
             please.FuelMoisture = [6, 7, 8, 60, 90];
@@ -176,7 +176,9 @@ namespace RoxCaseGen
             int[,,] allSafetyBoundaries =
                 new int[models.GetLength(0), please.FuelMap.GetLength(0), please.FuelMap.GetLength(1)];
             int[] consecutiveConvergence = new int[models.GetLength(0)];
-            float currentError=1;
+            float[] currentError=[1,1,1,1,1,1,1];
+
+            float executionTime = 0;
 
             while (!modelsDone.All(x => x))
             {
@@ -185,7 +187,7 @@ namespace RoxCaseGen
                     RunModels.CheckInputsExist(path);
                     Console.WriteLine($"Sim no: {simNo}, current convergence: ");
                     int[] ignitionCoords = please.InitialiseIterationAndGetIgnition(path);
-                    please.ConditioningDays = 1 + burnHours / 24;
+                    please.ConditioningDays = 1 + burnHours[1] / 24;
                     RunModels.SetupFarsiteIteration(path + "Farsite/Input/", ignitionCoords, please);
                     RunModels.ConvertToSpecificModel("Farsite", path, please);
                     RunModels.RunModel(models[0], path, please, simNo);
@@ -209,16 +211,20 @@ namespace RoxCaseGen
                     Console.WriteLine($"Sim no: {simNo}, current convergence: ");
                     for (int i = 0; i < models.Length; i++)
                     {
-                        Console.WriteLine($"{models[i]}: {modelsDone[i]}");
+                        Console.WriteLine($"{models[i]}: {currentError[i]}, {modelsDone[i]}");
                     }
 
                     int[] ignitionCoords = please.InitialiseIterationAndGetIgnition(path);
                     please.GetFmc(path);
+                    please.BurnHours = burnHours[0];
                     RunModels.SetupFarsiteIteration(path + "Farsite/Input/", ignitionCoords, please);
 
                     string failFlag = "";
                     for (int i = 0; i < models.GetLength(0); i++)
                     {
+                        please.BurnHours = burnHours[i];
+                        Stopwatch stopwatch = new Stopwatch();
+                        stopwatch.Start();
                         RunModels.ConvertToSpecificModel(models[i], path, please);
                         try
                         {
@@ -233,6 +239,7 @@ namespace RoxCaseGen
                             int[,] temp = peril.CalcSingularBoundary(please.Cellsize, (int)please.ActualAset,
                                 please.WindMag, wui, ros,
                                 azimuth); //Call k-PERIL to find the boundary of this simulation
+
                             temp = ModelSetup.TransposeMatrix(temp);
                             for (int j = 0; j < temp.GetLength(0); j++)
                             {
@@ -246,7 +253,7 @@ namespace RoxCaseGen
                                 path + $"Outputs/SafetyMatrix_{models[i]}_" + simNo + ".txt");
                             if (simNo > 20)
                             {
-                                currentError = please.CalcConvergence(simNo, path, models[i]);
+                                currentError[i] = please.CalcConvergence(simNo, path, models[i]);
                             }
                         }
                         catch (Exception e)
@@ -257,7 +264,7 @@ namespace RoxCaseGen
 
                         ModelSetup.Output_ASC_File(header, ModelSetup.GetSlice(allSafetyBoundaries, i),
                             path + $"Outputs/SafetyMatrix_{models[i]}{failFlag}.txt");
-                        if (currentError < 0.003)
+                        if (currentError[i] < 0.01)
                         {
                             consecutiveConvergence[i]++;
                         }
@@ -274,11 +281,14 @@ namespace RoxCaseGen
                         failFlag = "";
                         //modelsDone[modelsDone.Length-1] = true;
                         //modelsDone[modelsDone.Length-2] = true;
+                        stopwatch.Stop();
+                        File.AppendAllText($"{path}/times.txt", $"{stopwatch.Elapsed.TotalMilliseconds} ");
                     }
                     RunModels.LogArrivalTimes(path, simNo);
                     Console.WriteLine($"Iteration finished: {simNo}");
                     //Console.ReadLine();
                     ModelSetup.PrepareNextIteration(path);
+                    File.AppendAllText($"{path}/times.txt", Environment.NewLine);
                 }
             }
 

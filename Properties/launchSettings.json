@@ -3,8 +3,8 @@
     "RoxCaseGen": {
       "commandName": "Project",
       "environmentVariables": {
-        "RUNPATH": "D:/OneDrive - Imperial College London/Imperial/PhD/k2PERIL/",
-        "WISEPREPROCPATH": "D:\\OneDrive - Imperial College London\\Imperial\\PhD\\RACEWILDFIRE\\2Dsmoke\\WISE-Preprocessor\\bin\\Release\\net6.0"
+        "RUNPATH": "C:/k2PERIL/",
+        "WISEPREPROCPATH": "C:\\Users\\nikos\\RiderProjects\\WISE-Preprocessor\\bin\\Debug\\net6.0"
       }
     },
     "Docker": {

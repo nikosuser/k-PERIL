@@ -297,21 +297,21 @@ namespace RoxCaseGen
                 currTime = currTime.AddHours(1);
             }
             //THe FARSITE simulations will happen with the below parameters. They are currently hardcoded. Notice how GRIDDED WIND is being used here.
-            outputFile.Add("FOLIAR_MOISTURE_CONTENT: 60");
+            outputFile.Add("FOLIAR_MOISTURE_CONTENT: 80");
             outputFile.Add("CROWN_FIRE_METHOD: Finney");
             outputFile.Add("NUMBER_PROCESSORS: 32");
-            outputFile.Add("GRIDDED_WINDS_GENERATE: Yes");
-            outputFile.Add("GRIDDED_WINDS_RESOLUTION: 10.0");
+            outputFile.Add("GRIDDED_WINDS_GENERATE: No");
+            outputFile.Add("GRIDDED_WINDS_RESOLUTION: 200.0");
             outputFile.Add($"FARSITE_START_TIME: {this.RawStartTime.Month.ToString("D")} {this.RawStartTime.Day.ToString("D")} {this.RawStartTime.Hour.ToString("D")}00"); 
             outputFile.Add($"FARSITE_END_TIME: {(this.RawStartTime.AddHours(this.BurnHours)).Month.ToString("D")} {(this.RawStartTime.AddHours(this.BurnHours)).Day.ToString("D")} {(this.RawStartTime.AddHours(this.BurnHours)).Hour.ToString("D")}00");
-            outputFile.Add("FARSITE_TIMESTEP: 60");
-            outputFile.Add("FARSITE_DISTANCE_RES: 60.0");
-            outputFile.Add("FARSITE_PERIMETER_RES: 60.0");
-            outputFile.Add("FARSITE_MIN_IGNITION_VERTEX_DISTANCE: 15.0");
-            outputFile.Add("FARSITE_SPOT_GRID_RESOLUTION: 30.0");
+            outputFile.Add("FARSITE_TIMESTEP: 120");
+            outputFile.Add($"FARSITE_DISTANCE_RES: {this.Cellsize}");
+            outputFile.Add($"FARSITE_PERIMETER_RES: {this.Cellsize}");
+            outputFile.Add($"FARSITE_MIN_IGNITION_VERTEX_DISTANCE: 150.0");
+            outputFile.Add($"FARSITE_SPOT_GRID_RESOLUTION: {this.Cellsize}");
             outputFile.Add("FARSITE_SPOT_PROBABILITY: 0.05");
             outputFile.Add("FARSITE_SPOT_IGNITION_DELAY: 0");
-            outputFile.Add("FARSITE_MINIMUM_SPOT_DISTANCE: 60");
+            outputFile.Add($"FARSITE_MINIMUM_SPOT_DISTANCE: {2 * this.Cellsize}");
             outputFile.Add("FARSITE_ACCELERATION_ON: 1");
 
             File.WriteAllLines(path + "ROX.input", outputFile.ToArray());
@@ -654,11 +654,34 @@ namespace RoxCaseGen
 
             this._ignitionFuelModel = (int)this.FuelMap[this.YIgnitionRaster, this.XIgnitionRaster];      //find the fuel inside the ignition point
 
-            while (this._ignitionFuelModel == -9999 || this._ignitionFuelModel == 91 || this._ignitionFuelModel == 92 || this._ignitionFuelModel == 93 || this._ignitionFuelModel == 98 || this._ignitionFuelModel == 99 || PointDistance(this.XIgnitionRaster,this.YIgnitionRaster,(int)wuIcenter.X, (int)wuIcenter.Y) < Math.Min(ncols / 3, nrows / 3) ) //if the ignition point has nonfuel on it, or is outside the designated area, retry
+            int[] ignitionAndNeighbors = [(int)this.FuelMap[this.YIgnitionRaster, this.XIgnitionRaster],
+                (int)this.FuelMap[this.YIgnitionRaster+1, this.XIgnitionRaster],
+                (int)this.FuelMap[this.YIgnitionRaster, this.XIgnitionRaster+1],
+                (int)this.FuelMap[this.YIgnitionRaster-1, this.XIgnitionRaster],
+                (int)this.FuelMap[this.YIgnitionRaster, this.XIgnitionRaster+1],
+                (int)this.FuelMap[this.YIgnitionRaster+1, this.XIgnitionRaster+1],
+                (int)this.FuelMap[this.YIgnitionRaster+1, this.XIgnitionRaster-1],
+                (int)this.FuelMap[this.YIgnitionRaster-1, this.XIgnitionRaster+1],
+                (int)this.FuelMap[this.YIgnitionRaster-1, this.XIgnitionRaster-1]];
+
+            int[] noFireSpreadAllowed = [-9999, 91, 92, 93, 98, 99];
+
+            while (ignitionAndNeighbors.Intersect(noFireSpreadAllowed).Any() || 
+                   PointDistance(this.XIgnitionRaster,this.YIgnitionRaster,(int)wuIcenter.X, (int)wuIcenter.Y) < Math.Min(ncols / 3, nrows / 3) ) //if the ignition point has nonfuel on it, or is outside the designated area, retry
             {
+                bool debug_result = ignitionAndNeighbors.Intersect(noFireSpreadAllowed).Any();
                 this.XIgnitionRaster = (int)((rand.NextDouble()*0.8+0.1) * ncols);
                 this.YIgnitionRaster = (int)((rand.NextDouble()*0.8+0.1) * nrows);
-                this._ignitionFuelModel = (int)this.FuelMap[this.YIgnitionRaster, this.XIgnitionRaster];
+                this._ignitionFuelModel = (int)this.FuelMap[this.YIgnitionRaster, this.XIgnitionRaster];      //find the fuel inside the ignition point
+                ignitionAndNeighbors = [(int)this.FuelMap[this.YIgnitionRaster, this.XIgnitionRaster],
+                    (int)this.FuelMap[this.YIgnitionRaster+1, this.XIgnitionRaster],
+                    (int)this.FuelMap[this.YIgnitionRaster, this.XIgnitionRaster+1],
+                    (int)this.FuelMap[this.YIgnitionRaster-1, this.XIgnitionRaster],
+                    (int)this.FuelMap[this.YIgnitionRaster, this.XIgnitionRaster+1],
+                    (int)this.FuelMap[this.YIgnitionRaster+1, this.XIgnitionRaster+1],
+                    (int)this.FuelMap[this.YIgnitionRaster+1, this.XIgnitionRaster-1],
+                    (int)this.FuelMap[this.YIgnitionRaster-1, this.XIgnitionRaster+1],
+                    (int)this.FuelMap[this.YIgnitionRaster-1, this.XIgnitionRaster-1]];
             }
 
             double[] proportionalIgnitionPoint = new double[2] { (float)this.XIgnitionRaster / (float)ncols, (float)this.YIgnitionRaster / (float)nrows };  //convert from raster values to proportional/nondimensional values (0-1 progress from the origin)
