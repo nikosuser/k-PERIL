@@ -44,12 +44,10 @@ namespace kPERIL_DLL
             _totalX = totalX;
             _totalY = totalY;
 
-            _haveData = true;
-            
-            
+            _haveData = true;   
         }
 
-        public int[,] CalculateTriggerBoundary(int[] wuInput)
+        public int[,]? CalculateTriggerBoundary(int[] wuInput)
         {
             if (_haveData)
             {

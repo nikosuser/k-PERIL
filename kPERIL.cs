@@ -8,7 +8,7 @@ namespace kPERIL_DLL
 {  
     public class kPERIL
     {
-        private List<int[,]> _allBoundaries;
+        private List<int[,]>? _allBoundaries;
         private int[] _rasterSize;
         private PERILData _data;
         private bool _debug;
@@ -38,7 +38,7 @@ namespace kPERIL_DLL
         /// <param name="aspect">The aspect of the terrain in degrees</param>
         /// <param name="consoleOutput">Optional, used to capture any console messages from k-PERIL.</param>
         /// <returns>An X by Y array representing the landscape. Points are 1 if inside the boundary and 0 if outside.</returns>
-        public int[,] CalculateBoundary(float cellSize, float rset, float bufferTime, float[,] midFlameWindspeed, float[,] windDir, int[,] wuiArea, float[,] ros, float[,] azimuth, float[,] slope, float[,] aspect, System.IO.StringWriter consoleOutput = null)
+        public int[,]? CalculateBoundary(float cellSize, float rset, float bufferTime, float[,] midFlameWindspeed, float[,] windDir, int[,] wuiArea, float[,] ros, float[,] azimuth, float[,] slope, float[,] aspect, StringWriter consoleOutput = null)
         {
             //if we call from a non console program we need to be able to access the log/error messages
             if(consoleOutput != null)
@@ -59,9 +59,9 @@ namespace kPERIL_DLL
             int[,] wui = _data.CompoundBoundary(wuiArea);  
             
             //check the WUI points are in the fire raster, and the fire reaches the WUI points. The returned array is in 1D coordinates. 
-            int[] wuInput = _data.CheckOutOfBounds(wui);
+            int[] wuiInput = _data.CheckOutOfBounds(wui);
             
-            int[,] safetyMatrix = _data.CalculateTriggerBoundary(wuInput);        
+            int[,]? safetyMatrix = _data.CalculateTriggerBoundary(wuiInput);        
 
             if(consoleOutput != null)
             {
@@ -101,9 +101,11 @@ namespace kPERIL_DLL
 
             for (int i=0; i<ros.Length; i++)
             {
-                int[,] boundary = CalculateBoundary(cellSize, rset[i], bufferTime[i], midFlameWindspeed[i], windDir[i],
-                    wuIarea, ros[i], azimuth[i], slope, aspect, consoleOutput);
-                _allBoundaries.Add(boundary);
+                int[,]? boundary = CalculateBoundary(cellSize, rset[i], bufferTime[i], midFlameWindspeed[i], windDir[i], wuIarea, ros[i], azimuth[i], slope, aspect, consoleOutput);
+                if(boundary != null)
+                {
+                    _allBoundaries.Add(boundary);
+                }               
             }
 
             return _allBoundaries;
@@ -113,7 +115,7 @@ namespace kPERIL_DLL
         /// Sums up all the boundaries calculated in calcMultipleBoundaries.
         /// </summary>
         /// <returns>An X by Y array representing the domain</returns>
-        public int[,] GetProbabilityBoundary()
+        public int[,]? GetProbabilityBoundary()
         {
             if(_allBoundaries == null)
             {
