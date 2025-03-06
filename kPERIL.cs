@@ -10,7 +10,7 @@ namespace kPERIL_DLL
     {
         private List<int[,]> _allBoundaries;
         private int[] _rasterSize;
-        private PERILData _data;
+        private PerilData _data;
         private bool _debug;
         
         /// <summary>
@@ -19,7 +19,7 @@ namespace kPERIL_DLL
         public kPERIL(bool debug) 
         {
             _rasterSize = new int[2];
-            _data = new PERILData(this);
+            _data = new PerilData(this);
             _debug = debug;
         }
 
@@ -31,14 +31,15 @@ namespace kPERIL_DLL
         /// <param name="bufferTime"> Any additional buffer time desired on top of RSET</param>
         /// <param name="midFlameWindspeed">The wind speed in the midflame height, raster (spatial, depending on the fire arrival time)</param>
         /// <param name="windDir">Midflame wind direction raster (spatial, depending on the fire arrival time).</param>
-        /// <param name="wuiArea">An X by 2 array listing points defining a polygon. This polygon is used as the urban area around which the boundary is calculated.The dimensions of each point are about the domain with (0,0) being the top left corner. The WUI area must be defined by a single complete polygon, and the points should be ordered (clockwise or counterclockwise).</param>
+        /// <param name="wuiArea">An X by 2 array listing points defining a polygon. This polygon is used as the urban area around which the boundary is calculated.The dimensions of each point are about the domain with (0,0) being the top left corner. The WUI area must be defined by a single complete polygon, and the points should be ordered (clockwise or counterclockwise). Alternatively, it can be a list of the poinds on the periphery of the WUI area. Specify which array you select using the isEdgePointList boolean.</param>
+        /// <param name="isEdgePointList">True if the wuiArea array is of individual polygon vertices, false if it is a list of all the points in the WUI area boundary.</param>
         /// <param name="ros">The rate of spread magniture array of size X by Y, in meters per minute</param>
         /// <param name="azimuth">The rate of spread direction array of size X by Y, in degrees from north, clockwise</param>
         /// <param name="slope">The slope of the terrain in degrees</param>
         /// <param name="aspect">The aspect of the terrain in degrees</param>
         /// <param name="consoleOutput">Optional, used to capture any console messages from k-PERIL.</param>
         /// <returns>An X by Y array representing the landscape. Points are 1 if inside the boundary and 0 if outside.</returns>
-        public int[,] CalculateBoundary(float cellSize, float rset, float bufferTime, float[,] midFlameWindspeed, float[,] windDir, int[,] wuiArea, float[,] ros, float[,] azimuth, float[,] slope, float[,] aspect, System.IO.StringWriter consoleOutput = null)
+        public int[,] CalculateBoundary(float cellSize, float rset, float bufferTime, float[,] midFlameWindspeed, float[,] windDir, int[,] wuiArea, bool isEdgePointList, float[,] ros, float[,] azimuth, float[,] slope, float[,] aspect, System.IO.StringWriter consoleOutput = null)
         {
             //if we call from a non console program we need to be able to access the log/error messages
             if(consoleOutput != null)
@@ -55,8 +56,17 @@ namespace kPERIL_DLL
 
             _data.SetData(cellSize, rset + bufferTime, midFlameWindspeed, windDir, ros, azimuth, slope,aspect, xDim, yDim);
 
-            //get the boundary points of the WUI area only
-            int[,] wui = _data.CompoundBoundary(wuiArea);  
+            int[,] wui;
+            if (isEdgePointList)
+            {
+                //get the boundary points of the WUI area only
+                wui = _data.CompoundBoundary(wuiArea);  
+            }
+            else
+            {
+                wui = wuiArea;
+            }
+            
             
             //check the WUI points are in the fire raster, and the fire reaches the WUI points. The returned array is in 1D coordinates. 
             int[] wuInput = _data.CheckOutOfBounds(wui);
@@ -74,10 +84,18 @@ namespace kPERIL_DLL
 
             if (_debug)
             {
-                _data.debugExport("D:\\OneDrive - Imperial College London\\Desktop\\kPerilTest/debug/");
+                _data.DebugExport("D:\\OneDrive - Imperial College London\\Desktop\\kPerilTest/debug/");
             }
             
             return safetyMatrix;           
+        }
+        /// <summary>
+        /// Method to directly set rosTheta, the rate of spread direction of each point, in relation to its eight neighbors. The order is clockwise starting from North
+        /// </summary>
+        /// <param name="rosTheta">The N by 8 ROS list.</param>
+        public void setRosTheta(float[,] rosTheta)
+        {
+            setRosTheta(rosTheta);
         }
 
         /// <summary>
@@ -88,21 +106,22 @@ namespace kPERIL_DLL
         /// <param name="bufferTime"> An array of any additional buffer time desired on top of rset</param>
         /// <param name="midFlameWindspeed">An array of the wind speed in the midflame height raster (spatial, depending on the fire arrival time)</param>
         /// <param name="windDir">Array of midflame wind direction raster (spatial, depending on the fire arrival time)</param>
-        /// <param name="wuIarea">An X by 2 array listing points defining a polygon. This polygon is used as the urban area around which the boundary is calculated.The dimensions of each point are about the domain with (0,0) being the top left corner. The polygon should be a single continuous shape, with points specified in either clockwise or counterclockwise order.</param>
+        /// <param name="wuiArea">An X by 2 array listing points defining a polygon. This polygon is used as the urban area around which the boundary is calculated.The dimensions of each point are about the domain with (0,0) being the top left corner. The WUI area must be defined by a single complete polygon, and the points should be ordered (clockwise or counterclockwise). Alternatively, it can be a list of the poinds on the periphery of the WUI area. Specify which array you select using the isEdgePointList boolean.</param>
+        /// <param name="isEdgePointList">True if the wuiArea array is of individual polygon vertices, false if it is a list of all the points in the WUI area boundary.</param>
         /// <param name="ros">A jagged array of The rate of spread magniture array of size X by Y, in meters per minute</param>
         /// <param name="azimuth">A jagged array of The rate of spread direction array of size X by Y, in degrees from north, clockwise</param>
         /// <param name="slope">Slope of the terrain in degrees</param>
         /// <param name="aspect">Aspect of the terrain in degrees</param>
         /// <param name="consoleOutput">Optional, used to capture any console messages from k-PERIL.</param>
         /// <returns>A list of X by Y arrays representing the landscape. Points in each array are 1 if inside the boundary and 0 if outside.</returns>
-        public List<int[,]> CalculateMultipleBoundaries(float cellSize, float[] rset, float[] bufferTime, float[][,] midFlameWindspeed, float[][,] windDir, int[,] wuIarea, float[][,] ros, float[][,] azimuth, float[,] slope, float[,] aspect, System.IO.StringWriter consoleOutput = null)
+        public List<int[,]> CalculateMultipleBoundaries(float cellSize, float[] rset, float[] bufferTime, float[][,] midFlameWindspeed, float[][,] windDir, int[,] wuiArea, bool isEdgePointList, float[][,] ros, float[][,] azimuth, float[,] slope, float[,] aspect, System.IO.StringWriter consoleOutput = null)
         {
             _allBoundaries = new List<int[,]>();
 
             for (int i=0; i<ros.Length; i++)
             {
                 int[,] boundary = CalculateBoundary(cellSize, rset[i], bufferTime[i], midFlameWindspeed[i], windDir[i],
-                    wuIarea, ros[i], azimuth[i], slope, aspect, consoleOutput);
+                    wuiArea, isEdgePointList, ros[i], azimuth[i], slope, aspect, consoleOutput);
                 _allBoundaries.Add(boundary);
             }
 
@@ -138,17 +157,17 @@ namespace kPERIL_DLL
         /// Getter for the list containing all the calculated boundaries
         /// </summary>
         /// <returns></returns>
-        public List<int[,]> GetBoundaryList()
+        public List<int[,]> GetIndividualBoundaryList()
         {
             return _allBoundaries;
         }
         
         /// <summary>
-        /// Method to get the overall boundary line from a probabilistic boundary 
+        /// Method to get the overall boundary line from a probabilistic boundary. Generalisable to get the boundary of a raster with a defined area. 
         /// </summary>
         /// <param name="compoundBoundary">The 2D raster of the probabilistic trigger boundary</param>
         /// <returns>A coordinates list of X by 2 of the points on the line boundary </returns>
-        public static int[,] GetLineBoundary(int[,] compoundBoundary)
+        public static int[,] GetOutermostLineBoundary(int[,] compoundBoundary)
         {
             List<int> uniqueBoundary = new List<int>();
 
@@ -326,6 +345,14 @@ namespace kPERIL_DLL
             return output;
         }
 
+        /// <summary>
+        /// Use the weather station temporal wind data and the fire arrival time to specify the wind in each point in the landscape, when the fire goes through it. Also interpolates between hourly weather values. 
+        /// </summary>
+        /// <param name="windMag">Wind magnitude array</param>
+        /// <param name="windDir">Wind direction array</param>
+        /// <param name="rawsTimes">DateTimes of wind readings of previous arrays</param>
+        /// <param name="arrivalTime">Fire arrival time raster</param>
+        /// <returns>Wind magnitude and wind direction rasters</returns>
         public (float[,], float[,]) ConvertTemporalToSpatialWind(float[] windMag, float[] windDir, DateTime[] rawsTimes,
             float[,] arrivalTime)
         {
@@ -353,6 +380,7 @@ namespace kPERIL_DLL
             }
             return (windMagRaster, windDirRaster);
         }
+        
         
     }
 }

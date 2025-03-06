@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace kPERIL_DLL
 {
-    internal class PERILData
+    internal class PerilData
     {
         private float[,] _azimuth;               //Rate of spread Direction
         private float[,] _ros;                   //Rate of Spread Magnitude
@@ -18,23 +18,24 @@ namespace kPERIL_DLL
         private float[,] _windDir;               //wind direction (spatial)
         private int _totalY;                     //Total raster size in Y
         private int _totalX;                     //Total raster size in X
-        private int[] nonBoundaryPoints;                     //linearised array of all the non-boundary nodes
+        private int[] _nonBoundaryPoints;                     //linearised array of all the non-boundary nodes
         private float _cell;                     //cell size (m)
         private float _triggerBuffer;            //trigger buffer time in minutes
-        private int[,] pointNeightborSet;                  //tracks the cardinal neighbors of each linearised cell.
+        private int[,] _pointNeightborSet;                  //tracks the cardinal neighbors of each linearised cell.
         private float[,] _graph;                 //variable to store the weight values for the target node
         private bool _haveData = false;
+        private bool _haveRosTheta = false;
         private kPERIL _perilOwner;
 
-        public PERILData(kPERIL perilOwner)
+        public PerilData(kPERIL perilOwner)
         {
             _perilOwner = perilOwner;
         }
 
-        public void SetData(float cell, float RSET, float[,] u, float[,] windDir, float[,] ros, float[,] azimuth, float[,] slope, float[,] aspect, int totalX, int totalY)
+        public void SetData(float cell, float rset, float[,] u, float[,] windDir, float[,] ros, float[,] azimuth, float[,] slope, float[,] aspect, int totalX, int totalY)
         {
             _cell = cell;
-            _triggerBuffer = RSET;
+            _triggerBuffer = rset;
             _u = u;
             _windDir = windDir;
             _ros = ros;
@@ -53,10 +54,12 @@ namespace kPERIL_DLL
         {
             if (_haveData)
             {
-                GetEffectiveWindWithSlope(); 
-                
-                CalculateRosTheta();
-                //Console.WriteLine("ROS_THETA GENERATED");                                       
+                GetEffectiveWindWithSlope();
+                if (!_haveRosTheta)
+                {
+                    CalculateRosTheta();
+                    //Console.WriteLine("ROS_THETA GENERATED");       
+                }
 
                 SetNonBoundaryPoints();
                 //Console.WriteLine("ROSn GENERATED");                                           
@@ -74,6 +77,15 @@ namespace kPERIL_DLL
             }
 
             return null;
+        }
+        /// <summary>
+        /// Method to directly set rosTheta, the rate of spread direction of each point, in relation to its eight neighbors. The order is clockwise starting from North
+        /// </summary>
+        /// <param name="rosTheta">The N by 8 ROS list.</param>
+        public void setRosTheta(float[,] rosTheta)
+        {
+            _rosTheta = rosTheta;
+            _haveRosTheta = true;
         }
 
         /// <summary>
@@ -128,14 +140,14 @@ namespace kPERIL_DLL
         /// </summary>
         private void SetNonBoundaryPoints()
         {
-            nonBoundaryPoints = new int[(_totalX - 2) * (_totalY - 2)];
+            _nonBoundaryPoints = new int[(_totalX - 2) * (_totalY - 2)];
             int index = 0;
             for (int i = 1; i < _totalX - 1; i++)
             {
                 for (int j = 1; j < _totalY - 1; j++)
                 {
                     //add it to the list  
-                    nonBoundaryPoints[index] = LinearisePoint(new int[] {i,j});
+                    _nonBoundaryPoints[index] = LinearisePoint(new int[] {i,j});
                     ++index;
                 }
             }
@@ -160,30 +172,30 @@ namespace kPERIL_DLL
         private void SetPointNeighborSet()
         {
             //create output variable
-            int[,] pointNeighborSet = new int[nonBoundaryPoints.Max() + 1, 8];
+            int[,] pointNeighborSet = new int[_nonBoundaryPoints.Max() + 1, 8];
 
             //for every element is rosn calculate and catalog its linearised neighbor
-            for (int i = 0; i < nonBoundaryPoints.Length; i++)
+            for (int i = 0; i < _nonBoundaryPoints.Length; i++)
             {
                 //North
-                pointNeighborSet[nonBoundaryPoints[i], 0] = nonBoundaryPoints[i] - 1;
+                pointNeighborSet[_nonBoundaryPoints[i], 0] = _nonBoundaryPoints[i] - 1;
                 //NE
-                pointNeighborSet[nonBoundaryPoints[i], 1] = nonBoundaryPoints[i] + _totalY - 1;
+                pointNeighborSet[_nonBoundaryPoints[i], 1] = _nonBoundaryPoints[i] + _totalY - 1;
                 //east
-                pointNeighborSet[nonBoundaryPoints[i], 2] = nonBoundaryPoints[i] + _totalY;
+                pointNeighborSet[_nonBoundaryPoints[i], 2] = _nonBoundaryPoints[i] + _totalY;
                 //SE
-                pointNeighborSet[nonBoundaryPoints[i], 3] = nonBoundaryPoints[i] + _totalY + 1;
+                pointNeighborSet[_nonBoundaryPoints[i], 3] = _nonBoundaryPoints[i] + _totalY + 1;
                 //South
-                pointNeighborSet[nonBoundaryPoints[i], 4] = nonBoundaryPoints[i] + 1;
+                pointNeighborSet[_nonBoundaryPoints[i], 4] = _nonBoundaryPoints[i] + 1;
                 //SW
-                pointNeighborSet[nonBoundaryPoints[i], 5] = nonBoundaryPoints[i] - _totalY + 1;
+                pointNeighborSet[_nonBoundaryPoints[i], 5] = _nonBoundaryPoints[i] - _totalY + 1;
                 //west
-                pointNeighborSet[nonBoundaryPoints[i], 6] = nonBoundaryPoints[i] - _totalY;
+                pointNeighborSet[_nonBoundaryPoints[i], 6] = _nonBoundaryPoints[i] - _totalY;
                 //NW          
-                pointNeighborSet[nonBoundaryPoints[i], 7] = nonBoundaryPoints[i] - _totalY - 1;
+                pointNeighborSet[_nonBoundaryPoints[i], 7] = _nonBoundaryPoints[i] - _totalY - 1;
             }
 
-            pointNeightborSet = pointNeighborSet;
+            _pointNeightborSet = pointNeighborSet;
         }
 
         /// <summary>
@@ -191,26 +203,26 @@ namespace kPERIL_DLL
         /// </summary>
         private void SetWeight()
         {
-            float[,] weight = new float[nonBoundaryPoints.Max() + 1, 8];
+            float[,] weight = new float[_nonBoundaryPoints.Max() + 1, 8];
 
-            for (int i = 0; i < nonBoundaryPoints.Length; i++)
+            for (int i = 0; i < _nonBoundaryPoints.Length; i++)
             {
-                int point = nonBoundaryPoints[i];
+                int point = _nonBoundaryPoints[i];
                 for (int j = 0; j < 8; j++)
                 {
                     //weighting is the average of the inverses of the ROS of the neighboring points. If we are for example examining a point and its north neighbor,
                     //we are averaging the inverses of the ROS directions towards the north (not the south, since we are creating an inverse weight matrix technically)
-                    if (_rosTheta[point, j] != 0 && _rosTheta[pointNeightborSet[point, j], j] != 0)
+                    if (_rosTheta[point, j] != 0 && _rosTheta[_pointNeightborSet[point, j], j] != 0)
                     {
                         //if the point is N S E or W
                         if (j % 2 == 0)
                         {
-                            weight[point, j] = (_cell / 2) * ((1 / _rosTheta[point, (j + 4) % 8]) + (1 / _rosTheta[pointNeightborSet[point, j], (j + 4) % 8]));
+                            weight[point, j] = (_cell / 2) * ((1 / _rosTheta[point, (j + 4) % 8]) + (1 / _rosTheta[_pointNeightborSet[point, j], (j + 4) % 8]));
                         }
                         //if the point is a corner node (have to account for a longer distance)
                         else
                         {
-                            weight[point, j] = 1.4142f * (_cell / 2) * ((1 / _rosTheta[point, (j + 4) % 8]) + (1 / _rosTheta[pointNeightborSet[point, j], (j + 4) % 8]));
+                            weight[point, j] = 1.4142f * (_cell / 2) * ((1 / _rosTheta[point, (j + 4) % 8]) + (1 / _rosTheta[_pointNeightborSet[point, j], (j + 4) % 8]));
                         }
                     }
                 }
@@ -429,7 +441,7 @@ namespace kPERIL_DLL
                 // Loop over all possible neighbors (using the second dimension of _graph)
                 for (int i = 0; i < _graph.GetLength(1); i++)
                 {
-                    int neighbor = pointNeightborSet[currentNode, i];
+                    int neighbor = _pointNeightborSet[currentNode, i];
                     if (neighbor == 0)
                         continue;  // Skip invalid neighbor entries
 
@@ -511,6 +523,11 @@ namespace kPERIL_DLL
                 int[] coords = DelinearisePoint(safetyMatrix1D[i]);
                 safetyMatrix[coords[0], coords[1]]++;
             }
+            for (int i = 0; i < wuInput.Length; i++)
+            {
+                int[] coords = DelinearisePoint(wuInput[i]);
+                safetyMatrix[coords[0], coords[1]]=2;
+            }
 
             Console.WriteLine();
             return safetyMatrix;
@@ -541,11 +558,16 @@ namespace kPERIL_DLL
                 {
                     minDistance = tempDistance;
                 }
-                //Linearise WUI accordingly
-                wuInput[i] = (modifiedCoordinates[0] - 1) * _totalY + modifiedCoordinates[1];
+
+                if (tempDistance < 6)
+                {
+                    //Linearise WUI accordingly
+                    wuInput[i] = (modifiedCoordinates[0] - 1) * _totalY + modifiedCoordinates[1];
+                }
+
             }
 
-            if (minDistance > _cell * 6)
+            if (minDistance > 6)
             {
                 throw new Exception(
                     "ERROR: The fire has a minimum distance to the WUI area greater than 6 cells worth. Either redo the wildfire simulation with more time or redraw the WUI area");
@@ -583,7 +605,7 @@ namespace kPERIL_DLL
             }
             _effectiveMidflameWindspeed= effectiveMidflameWindspeed;
         }
-        public void exportRaster(float[,] raster, string filePath)
+        private void ExportRaster(float[,] raster, string filePath)
         {
             int rows = raster.GetLength(0);
             int cols = raster.GetLength(1);
@@ -607,12 +629,12 @@ namespace kPERIL_DLL
             Console.WriteLine($"Matrix saved successfully to {filePath}");
         }
 
-        public void debugExport(string outputFolder)
+        public void DebugExport(string outputFolder)
         {
-            exportRaster(_rosTheta,outputFolder+"rosTheta.txt");
-            exportRaster(_effectiveMidflameWindspeed,outputFolder+"effectiveMidflameWindspeed.txt");
-            exportRaster(_u,outputFolder+"u.txt");
-            exportRaster(_windDir,outputFolder+"windDir.txt");
+            ExportRaster(_rosTheta,outputFolder+"rosTheta.txt");
+            ExportRaster(_effectiveMidflameWindspeed,outputFolder+"effectiveMidflameWindspeed.txt");
+            ExportRaster(_u,outputFolder+"u.txt");
+            ExportRaster(_windDir,outputFolder+"windDir.txt");
             //exportRaster();
         }
     }   
