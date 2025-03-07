@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using Priority_Queue;
 
 namespace kPERIL_DLL
 {
@@ -118,10 +119,10 @@ namespace kPERIL_DLL
                     for (int cardinal = 0; cardinal < 8; cardinal++)
                     {
                         //if the cell is active i.e. has been burned in the simulation
-                        if (_azimuth[y, x] >= 0)
+                        if (_azimuth[x, y] >= 0)
                         {
-                            rosX = a * Math.Sin((Math.PI * cardinal / 4) - _azimuth[y, x] * 2 * Math.PI / 360);
-                            rosY = c + b * Math.Cos((Math.PI * cardinal / 4) - _azimuth[y, x] * 2 * Math.PI / 360);
+                            rosX = a * Math.Sin((Math.PI * cardinal / 4) - _azimuth[x, y] * 2 * Math.PI / 360);
+                            rosY = c + b * Math.Cos((Math.PI * cardinal / 4) - _azimuth[x, y] * 2 * Math.PI / 360);
                             roStheta[linearIndex, cardinal] = (float)Math.Sqrt(Math.Pow(rosX, 2) + Math.Pow(rosY, 2));
                         }
                         else
@@ -405,6 +406,19 @@ namespace kPERIL_DLL
             return new int[] { (int)wui/ _totalY, wui % _totalY };
         }
         
+
+        // Custom node class for use with SimplePriorityQueue.
+        public class Node
+        {
+            public int Id { get; set; }
+            public float Distance { get; set; }  // This field mirrors the priority used in the queue
+
+            public Node(int id, float distance)
+            {
+                Id = id;
+                Distance = distance;
+            }
+        }
         /// <summary>
         /// BFS algorithm. Recursive with stop condition. Finds the time for the fire to reach the WUI area. 
         /// </summary>
@@ -413,28 +427,33 @@ namespace kPERIL_DLL
         private float[] BreadthFirstSearch(int wui)
         {
             int totalNodes = _graph.GetLength(0);
-            Queue<int> upNext = new Queue<int>();
-            float[] distance = new float[totalNodes];
-            bool[] enqueued = new bool[totalNodes];  // Tracks whether a node has been enqueued
+            // Create the SimplePriorityQueue with Node as the item type.
+            SimplePriorityQueue<Node> upNext = new SimplePriorityQueue<Node>();
 
-            // Initialize distances and enqueued flags
+            float[] distance = new float[totalNodes];
+            
+            // Initialize distances
             for (int i = 0; i < totalNodes; i++)
             {
                 distance[i] = float.MaxValue;
-                enqueued[i] = false;
             }
 
-            // Optionally, you might want to set the starting node's distance to 0 instead of 1,
-            // unless 1 is meaningful for your application.
-            upNext.Enqueue(wui);
-            enqueued[wui] = true;
+            // Set the starting node distance and add it to the priority queue.
             distance[wui] = 1;
+            upNext.Enqueue(new Node(wui, 1), 1);
 
             while (upNext.Count > 0)
             {
-                int currentNode = upNext.Dequeue();  // Remove and get the current node
+                // Dequeue the node with the smallest distance.
+                Node current = upNext.Dequeue();
+                int currentNode = current.Id;
+                float currentDist = current.Distance;
 
-                // Skip processing if the node is on the boundary
+                // Skip if a better distance has already been found.
+                if (currentDist > distance[currentNode])
+                    continue;
+
+                // Stop processing neighbors if current node is on the boundary.
                 if (IsOnBoundary(currentNode))
                     continue;
 
@@ -445,26 +464,25 @@ namespace kPERIL_DLL
                     if (neighbor == 0)
                         continue;  // Skip invalid neighbor entries
 
-                    // Ensure the edge weight is valid
+                    // Ensure the edge weight is valid.
                     if (_graph[currentNode, i] <= 0)
                         continue;
 
-                    // Calculate the new distance from the start node
+                    // Calculate new tentative distance from the start node.
                     float newDistance = distance[currentNode] + _graph[currentNode, i];
 
-                    // If we found a shorter path, update the distance.
+                    // If a shorter path is found, update the distance.
                     if (newDistance < distance[neighbor])
                     {
                         distance[neighbor] = newDistance;
+                        int[] neighbor2D = DelinearisePoint(neighbor);
 
-                        // If the neighbor meets your trigger conditions and isn't already queued, enqueue it.
-                        // (Note: Adjust _triggerBuffer and _ros as needed for your logic.)
+                        // Enqueue the neighbor if it meets your trigger conditions.
                         if (newDistance <= _triggerBuffer &&
-                            !enqueued[neighbor] &&
-                            _ros[(int)(neighbor / _ros.GetLength(0)), neighbor % _ros.GetLength(0)] > 0)
+                            _ros[neighbor2D[0], neighbor2D[1]] > 0)
                         {
-                            upNext.Enqueue(neighbor);
-                            enqueued[neighbor] = true;
+                            // Enqueue a new node for the neighbor with its updated distance.
+                            upNext.Enqueue(new Node(neighbor, newDistance), newDistance);
                         }
                     }
                 }
@@ -514,6 +532,7 @@ namespace kPERIL_DLL
                     allDistances[j, i] = temp[j];
                 }
             }
+            //ExportRaster(allDistances, "D:\\OneDrive - Imperial College London\\Desktop\\kPerilTest\\debug/allDistances.txt");
             
             int[,] safetyMatrix = new int[_totalX, _totalY];
             int[] safetyMatrix1D = GetBoundary(allDistances);
@@ -635,6 +654,7 @@ namespace kPERIL_DLL
             ExportRaster(_effectiveMidflameWindspeed,outputFolder+"effectiveMidflameWindspeed.txt");
             ExportRaster(_u,outputFolder+"u.txt");
             ExportRaster(_windDir,outputFolder+"windDir.txt");
+            ExportRaster(_graph,outputFolder+"graph.txt");
             //exportRaster();
         }
     }   
